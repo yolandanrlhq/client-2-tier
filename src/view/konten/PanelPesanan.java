@@ -1,62 +1,62 @@
 package view.konten;
 
-import java.awt.Color;
-import java.awt.Font;
+import java.awt.*;
+import java.sql.*;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import net.miginfocom.swing.MigLayout;
+import config.DBConfig;
 
 public class PanelPesanan extends JPanel {
+    private JTable table;
+    private DefaultTableModel model;
 
     public PanelPesanan() {
         initializeUI();
+        loadData();
     }
 
     private void initializeUI() {
-        // Menggunakan layout yang sama dengan standar aplikasi kamu
         setLayout(new MigLayout("fill, insets 30", "[grow]", "[]20[grow]"));
         setBackground(Color.WHITE);
 
-        // Header Panel
-        JLabel title = new JLabel("Daftar Pesanan & Sewa");
+        JLabel title = new JLabel("Daftar Transaksi Sewa");
         title.setFont(new Font("Inter", Font.BOLD, 28));
-        title.setForeground(new Color(0, 48, 73)); // Warna Navy sesuai tema
         add(title, "wrap");
 
-        // Tabel Pesanan
-        String[] columns = {
-            "ID Sewa", "Penyewa", "Kostum Karakter", "Tgl Pinjam", "Tgl Kembali", "Total", "Status"
-        };
-
-        // Contoh Data Dummy (nanti bisa diambil dari Database)
-        Object[][] data = {
-            {"TRX-001", "Budi Utomo", "Naruto Sage Mode", "2023-10-01", "2023-10-03", "Rp 300.000", "Disewa"},
-            {"TRX-002", "Siska Amelia", "Wonder Woman", "2023-10-05", "2023-10-06", "Rp 250.000", "Selesai"},
-            {"TRX-003", "Andi Wijaya", "Tanjiro Kamado", "2023-10-10", "2023-10-12", "Rp 350.000", "Terlambat"}
-        };
-
-        DefaultTableModel model = new DefaultTableModel(data, columns) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false; // Tabel tidak bisa diedit langsung
-            }
-        };
-
-        JTable table = new JTable(model);
-        setupTableStyle(table);
-
-        JScrollPane scrollPane = new JScrollPane(table);
-        scrollPane.setBorder(BorderFactory.createLineBorder(new Color(230, 230, 230)));
-        add(scrollPane, "grow");
-    }
-
-    private void setupTableStyle(JTable table) {
-        table.setFont(new Font("Inter", Font.PLAIN, 14));
+        // Kolom ditambah "Jumlah"
+        String[] columns = {"ID Sewa", "Penyewa", "Kostum", "Jumlah", "Tgl Pinjam", "Total", "Status"};
+        model = new DefaultTableModel(null, columns);
+        table = new JTable(model);
+        
+        // Styling tabel
         table.setRowHeight(35);
         table.getTableHeader().setFont(new Font("Inter", Font.BOLD, 14));
-        table.getTableHeader().setBackground(new Color(245, 247, 250));
-        table.setSelectionBackground(new Color(234, 242, 235)); // Warna hijau soft sesuai tema
-        table.setShowGrid(false);
-        table.setIntercellSpacing(new java.awt.Dimension(0, 0));
+        
+        add(new JScrollPane(table), "grow");
+    }
+
+    public void loadData() {
+        model.setRowCount(0);
+        try {
+            Connection conn = DBConfig.getConnection();
+            String sql = "SELECT p.*, k.nama_kostum FROM pesanan p " +
+                         "JOIN kostum k ON p.id_kostum = k.id_kostum";
+            ResultSet res = conn.createStatement().executeQuery(sql);
+
+            while(res.next()) {
+                model.addRow(new Object[]{
+                    res.getString("id_sewa"),
+                    res.getString("nama_penyewa"),
+                    res.getString("nama_kostum"),
+                    res.getInt("jumlah"), // Kolom baru
+                    res.getDate("tgl_pinjam"),
+                    "Rp " + res.getDouble("total_biaya"),
+                    res.getString("status")
+                });
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 }
