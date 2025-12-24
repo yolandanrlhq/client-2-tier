@@ -94,10 +94,13 @@ public class PanelAddPesanan extends JPanel {
         } catch (SQLException e) { e.printStackTrace(); }
     }
 
+    // Di PanelAddPesanan.java
     private void hitungTotal() {
         int jumlah = (int) txtJumlah.getValue();
-        double total = hargaPerUnit * jumlah;
-        txtTotal.setText(String.valueOf(total));
+        double total = hargaPerUnit * jumlah; 
+        
+        // Set teks ke TextField tanpa menghilangkan nol-nya
+        txtTotal.setText(String.format("%.0f", total)); 
     }
 
     private void simpanPesanan() {

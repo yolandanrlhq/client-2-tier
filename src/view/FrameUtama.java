@@ -107,6 +107,20 @@ public class FrameUtama extends JFrame {
         }
     }
 
+    // Contoh logika di FrameUtama saat menu diklik
+    public void gantiPanel(String key) {
+        cardLayout.show(panelKonten, key);
+        
+        // Jika panel yang dibuka adalah produk atau pesanan, panggil loadData-nya
+        if (key.equals("produk")) {
+            pProduk.loadData(); 
+        } else if (key.equals("pesanan")) {
+            pPesanan.loadData();
+        } else if (key.equals("dashboard")) {
+            pDashboard.refreshData();
+        }
+    }
+
     public static void main(String[] args) {
         // Jalankan aplikasi dengan tema FlatLaf (pastikan library sudah terpasang)
         SwingUtilities.invokeLater(() -> {

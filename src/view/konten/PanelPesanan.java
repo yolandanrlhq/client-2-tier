@@ -24,6 +24,11 @@ public class PanelPesanan extends JPanel {
         title.setFont(new Font("Inter", Font.BOLD, 28));
         add(title, "wrap");
 
+        JButton btnRefresh = new JButton("Refresh Data");
+        btnRefresh.setBackground(new Color(240, 240, 240));
+        btnRefresh.addActionListener(e -> loadData());
+        add(btnRefresh, "right, wrap");
+
         // Kolom ditambah "Jumlah"
         String[] columns = {"ID Sewa", "Penyewa", "Kostum", "Jumlah", "Tgl Pinjam", "Total", "Status"};
         model = new DefaultTableModel(null, columns);
@@ -45,13 +50,15 @@ public class PanelPesanan extends JPanel {
             ResultSet res = conn.createStatement().executeQuery(sql);
 
             while(res.next()) {
+                double total = res.getDouble("total_biaya");
+                
                 model.addRow(new Object[]{
                     res.getString("id_sewa"),
                     res.getString("nama_penyewa"),
                     res.getString("nama_kostum"),
-                    res.getInt("jumlah"), // Kolom baru
+                    res.getInt("jumlah"),
                     res.getDate("tgl_pinjam"),
-                    "Rp " + res.getDouble("total_biaya"),
+                    "Rp " + String.format("%,.0f", total), // Gunakan format ini
                     res.getString("status")
                 });
             }

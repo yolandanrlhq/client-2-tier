@@ -24,6 +24,12 @@ public class PanelProduk extends JPanel {
         title.setFont(new Font("Inter", Font.BOLD, 28));
         add(title, "wrap");
 
+        // Tambahkan Tombol Refresh
+        JButton btnRefresh = new JButton("Refresh Data");
+        btnRefresh.setBackground(new Color(240, 240, 240));
+        btnRefresh.addActionListener(e -> loadData()); // Panggil fungsi loadData saat diklik
+        add(btnRefresh, "right, wrap"); // Letakkan di kolom kedua (kanan)
+
         // Header harus sama jumlahnya dengan data di loadData
         String[] columns = {"ID", "Nama Kostum", "Kategori", "Stok", "Ukuran", "Harga Sewa", "Status"};
         model = new DefaultTableModel(null, columns) {
@@ -59,13 +65,17 @@ public class PanelProduk extends JPanel {
 
             // 4. Looping hasil database ke tabel UI
             while(res.next()) {
+                // Ambil nilai double dari database
+                double harga = res.getDouble("harga_sewa");
+                
                 model.addRow(new Object[]{
                     res.getString("id_kostum"),
                     res.getString("nama_kostum"),
                     res.getString("kategori"),
                     res.getInt("stok"),
                     res.getString("ukuran"),
-                    "Rp " + String.format("%,.0f", res.getDouble("harga_sewa")),
+                    // Format %,.0f artinya: Beri pemisah ribuan, dan 0 angka di belakang koma
+                    "Rp " + String.format("%,.0f", harga), 
                     res.getString("status")
                 });
             }
