@@ -84,7 +84,7 @@ int w = window.getWidth();
             add(new JLabel("Jumlah Unit")); add(txtJumlah, "w 100!, wrap 15");
             add(new JLabel("Total Biaya")); add(txtTotal, "growx, wrap 30");
 
-            add(btnSimpan, "span 2, center, w 300!, h 45!");
+            add(btnSimpan, "growx, span 2, h 45!");
 
         // ================= DESKTOP SMALL =================
         } else if (w <= 1200) {
@@ -100,7 +100,7 @@ int w = window.getWidth();
             add(new JLabel("Jumlah Unit")); add(txtJumlah, "w 90!, wrap 15");
             add(new JLabel("Total Biaya")); add(txtTotal, "wrap 30");
 
-            add(btnSimpan, "span 2, center, w 260!, h 45!");
+            add(btnSimpan, "span 2, center, h 45!");
 
         // ================= DESKTOP STANDARD =================
         } else {
@@ -116,7 +116,7 @@ int w = window.getWidth();
             add(new JLabel("Jumlah Unit")); add(txtJumlah, "w 100!, wrap 18");
             add(new JLabel("Total Biaya")); add(txtTotal, "wrap 40");
 
-            add(btnSimpan, "span 2, center, w 300!, h 48!");
+            add(btnSimpan, "span 2, center, h 48!");
         }
 
         revalidate();
@@ -124,17 +124,22 @@ int w = window.getWidth();
     }
 
     // --- SEMUA LOGIKA DATABASE KAMU DI BAWAH INI TETAP SAMA ---
-    private void loadKostumCombo() {
+    public void loadKostumCombo() {
         cbKostum.removeAllItems();
-        cbKostum.addItem("-- Pilih Kostum --");
-        try {
-            Connection conn = DBConfig.getConnection();
-            String sql = "SELECT id_kostum, nama_kostum FROM kostum WHERE status = 'Tersedia'";
-            ResultSet res = conn.createStatement().executeQuery(sql);
-            while(res.next()) {
-                cbKostum.addItem(res.getString("id_kostum") + " - " + res.getString("nama_kostum"));
+
+        String sql = "SELECT nama_kostum FROM kostum";
+
+        try (Connection conn = DBConfig.getConnection();
+            Statement st = conn.createStatement();
+            ResultSet rs = st.executeQuery(sql)) {
+
+            while (rs.next()) {
+                cbKostum.addItem(rs.getString("nama_kostum"));
             }
-        } catch (SQLException e) { e.printStackTrace(); }
+
+        } catch (SQLException e) {
+            System.err.println("Gagal load kostum: " + e.getMessage());
+        }
     }
 
     private void ambilHargaKostum() {
