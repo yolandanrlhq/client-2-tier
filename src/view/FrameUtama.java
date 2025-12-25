@@ -56,7 +56,7 @@ public class FrameUtama extends JFrame {
         pProduk = new PanelProduk();
         pPesanan = new PanelPesanan();
         pPelanggan = new PanelPelanggan();
-        pAddPesanan = new PanelAddPesanan();
+        pAddPesanan = new PanelAddPesanan(this);
 
         panelKonten.add(pDashboard, "dashboard");
         panelKonten.add(pProduk, "produk");
@@ -103,8 +103,8 @@ public class FrameUtama extends JFrame {
         // Logika Refresh Otomatis saat panel dibuka
         switch (key) {
             case "dashboard" -> pDashboard.refreshData();
-            case "produk" -> pProduk.loadData();
-            case "pesanan" -> pPesanan.loadData();
+            case "produk" -> pProduk.loadData("");
+            case "pesanan" -> pPesanan.loadData("");
             case "add_pesanan" -> pAddPesanan.loadKostumCombo();
             case "pelanggan" -> pPelanggan.loadData();
         }

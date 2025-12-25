@@ -10,29 +10,27 @@ import view.FrameUtama;
 public class DashboardApp {
 
     public static void main(String[] args) {
-        // 1. Setup Font Inter (Sesuai dengan kode awal kamu)
-        UIManager.put("defaultFont", new java.awt.Font("SansSerif", java.awt.Font.PLAIN, 13));
         
-        // 2. Setup Look and Feel (Tampilan Modern ala Mac)
         try {
-            // Mengatur font default aplikasi ke Inter
+            // 1. Kustomisasi Look and Feel sebelum Frame dibuat
             UIManager.put("defaultFont", new java.awt.Font("Inter", java.awt.Font.PLAIN, 13));
             
             // Mengaktifkan tema FlatLaf Mac Light
             FlatMacLightLaf.setup();
             
-            // Kustomisasi warna aksen agar hijau (sesuai tema penyewaan kamu)
+            // Kustomisasi warna aksen agar hijau (Soft Green sesuai Dashboard kamu)
             UIManager.put("Component.accentColor", new java.awt.Color(131, 188, 160));
+            UIManager.put("Button.arc", 10); // Tambahan: Membuat sudut tombol sedikit melengkung (modern)
             
         } catch (Exception ex) {
             System.err.println("Gagal menginisialisasi FlatLaf");
         }
 
-        // 3. Menjalankan Frame Utama
+        // 2. Menjalankan Frame Utama di Event Dispatch Thread (EDT)
         SwingUtilities.invokeLater(() -> {
             FrameUtama frame = new FrameUtama();
             frame.pack();
-            frame.setLocationRelativeTo(null); // Agar muncul di tengah layar
+            frame.setLocationRelativeTo(null);
             frame.setVisible(true);
         });
     }

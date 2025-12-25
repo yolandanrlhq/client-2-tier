@@ -2,10 +2,9 @@ package view.konten;
 
 import java.awt.*;
 import java.awt.event.*;
-import java.sql.*;
 import javax.swing.*;
 import net.miginfocom.swing.MigLayout;
-import config.DBConfig;
+// Tidak perlu import DAO di sini
 
 public class PanelDashboard extends JPanel {
 
@@ -48,6 +47,17 @@ public class PanelDashboard extends JPanel {
         add(cardContainer, "growx");
     }
 
+    public void refreshData() {
+        // View hanya memanggil Worker (Logika N-Tier)
+        new worker.dashboard.LoadDashboardWorker(stats -> {
+            if (stats != null) {
+                lblTotalKostum.setText(String.valueOf(stats.get("total_kostum").intValue()));
+                lblSedangDisewa.setText(String.valueOf(stats.get("sedang_disewa").intValue()));
+                lblTotalPendapatan.setText(String.format("%,.0f", stats.get("total_pendapatan")));
+            }
+        }).execute();
+    }
+
     private void adjustResponsiveness() {
         int w = getWidth();
         if (w <= 0) return;
@@ -79,21 +89,6 @@ public class PanelDashboard extends JPanel {
         cardContainer.add(createStatCard("Total Kostum", lblTotalKostum, new Color(234, 242, 235), new Color(131, 188, 160)), "grow, wrap 15");
         cardContainer.add(createStatCard("Sedang Disewa", lblSedangDisewa, new Color(235, 241, 253), new Color(108, 155, 244)), "grow, wrap 15");
         cardContainer.add(createStatCard("Total Pendapatan (Rp)", lblTotalPendapatan, new Color(255, 250, 235), new Color(255, 193, 7)), "grow");
-    }
-
-    public void refreshData() {
-        try (Connection conn = DBConfig.getConnection()) {
-            ResultSet rs1 = conn.createStatement().executeQuery("SELECT COUNT(*) FROM kostum");
-            if (rs1.next()) lblTotalKostum.setText(rs1.getString(1));
-
-            ResultSet rs2 = conn.createStatement().executeQuery("SELECT COUNT(*) FROM pesanan WHERE status = 'Disewa'");
-            if (rs2.next()) lblSedangDisewa.setText(rs2.getString(1));
-
-            ResultSet rs3 = conn.createStatement().executeQuery("SELECT SUM(total_biaya) FROM pesanan");
-            if (rs3.next()) lblTotalPendapatan.setText(String.format("%,.0f", rs3.getDouble(1)));
-        } catch (SQLException e) {
-            System.err.println("Dashboard Error: " + e.getMessage());
-        }
     }
 
     private JPanel createStatCard(String title, JLabel valueLabel, Color bgColor, Color accentColor) {
