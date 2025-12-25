@@ -3,7 +3,6 @@ package view.konten;
 import java.awt.*;
 import java.awt.event.*;
 import java.sql.*;
-import java.net.URI; // Import untuk WhatsApp
 import javax.swing.*;
 import javax.swing.table.*;
 import javax.swing.event.DocumentEvent;
@@ -24,6 +23,7 @@ public class PanelPelanggan extends JPanel {
         initializeUI();
         loadData();
 
+        // Listener untuk mendeteksi perubahan ukuran layar (Responsif)
         this.addComponentListener(new ComponentAdapter() {
             @Override
             public void componentResized(ComponentEvent e) {
@@ -33,16 +33,18 @@ public class PanelPelanggan extends JPanel {
     }
 
     private void initializeUI() {
-        mainLayout = new MigLayout("fill, insets 30", "[grow]", "[]10[]20[grow]");
+        mainLayout = new MigLayout("fillx, insets 30", "[grow]", "[]10[]20[grow]");
         setLayout(mainLayout);
         setBackground(Color.WHITE);
 
+        // HEADER
         title = new JLabel("Daftar Pelanggan");
         title.setFont(new Font("Inter", Font.BOLD, 28));
         title.setForeground(new Color(33, 37, 41));
 
         JButton btnRefresh = new JButton("Refresh");
         btnRefresh.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        btnRefresh.setFocusPainted(false);
         btnRefresh.addActionListener(e -> {
             txtSearch.setText("");
             loadData();
@@ -51,11 +53,13 @@ public class PanelPelanggan extends JPanel {
         add(title, "split 2, growx");
         add(btnRefresh, "right, wrap");
 
+        // SEARCH PANEL
         JPanel searchPanel = new JPanel(new MigLayout("insets 0", "[grow]"));
         searchPanel.setOpaque(false);
 
         txtSearch = new JTextField();
         txtSearch.putClientProperty("JTextField.placeholderText", "Cari nama pelanggan atau alamat...");
+        txtSearch.setFont(new Font("Inter", Font.PLAIN, 14));
         
         txtSearch.getDocument().addDocumentListener(new DocumentListener() {
             @Override public void insertUpdate(DocumentEvent e) { searchData(); }
@@ -64,35 +68,42 @@ public class PanelPelanggan extends JPanel {
         });
 
         searchPanel.add(new JLabel("Pencarian: "), "split 2");
-        searchPanel.add(txtSearch, "growx, h 35");
+        searchPanel.add(txtSearch, "growx, h 38!");
         add(searchPanel, "growx, wrap");
 
+        // TABLE SETUP
         String[] columns = {"ID", "Nama Pelanggan", "No WhatsApp", "Alamat", "Aksi"};
         model = new DefaultTableModel(null, columns) {
             @Override
             public boolean isCellEditable(int row, int column) {
-                return column == 4;
+                return column == 4; // Hanya kolom Aksi yang bisa diklik
             }
         };
 
         table = new JTable(model);
-        table.setRowHeight(45);
+        table.setRowHeight(50); // Baris lebih tinggi agar lega
         table.setShowGrid(false);
         table.setIntercellSpacing(new Dimension(0, 0));
-        table.setSelectionBackground(new Color(230, 245, 238));
+        table.setSelectionBackground(new Color(240, 245, 255));
+        table.setFont(new Font("Inter", Font.PLAIN, 14));
         
         rowSorter = new TableRowSorter<>(model);
         table.setRowSorter(rowSorter);
 
+        // Header Table Styling
         JTableHeader header = table.getTableHeader();
         header.setFont(new Font("Inter", Font.BOLD, 14));
-        header.setBackground(new Color(245, 247, 250));
-        header.setPreferredSize(new Dimension(header.getWidth(), 40));
+        header.setBackground(new Color(248, 249, 250));
+        header.setForeground(new Color(73, 80, 87));
+        header.setPreferredSize(new Dimension(header.getWidth(), 45));
+        header.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(230, 230, 230)));
 
+        // Center Align Kolom ID
         DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
         centerRenderer.setHorizontalAlignment(SwingConstants.CENTER);
         table.getColumnModel().getColumn(0).setCellRenderer(centerRenderer);
 
+        // Action Buttons
         table.getColumnModel().getColumn(4).setCellRenderer(new ActionRenderer());
         table.getColumnModel().getColumn(4).setCellEditor(new ActionEditor());
 
@@ -108,6 +119,7 @@ public class PanelPelanggan extends JPanel {
         if (text.trim().length() == 0) {
             rowSorter.setRowFilter(null);
         } else {
+            // Filter pada kolom Nama (indeks 1) dan Alamat (indeks 3)
             rowSorter.setRowFilter(RowFilter.regexFilter("(?i)" + text, 1, 3));
         }
     }
@@ -115,17 +127,20 @@ public class PanelPelanggan extends JPanel {
     private void applyResponsiveness() {
         int w = this.getWidth();
         TableColumnModel tcm = table.getColumnModel();
-        if (tcm.getColumnCount() < 4) return;
+        if (tcm.getColumnCount() < 5) return;
         
-        if (w < 600) {
-            title.setFont(new Font("Inter", Font.BOLD, 20));
-            tcm.getColumn(3).setMinWidth(0);
+        if (w < 750) {
+            // Tampilan Layar Kecil
+            title.setFont(new Font("Inter", Font.BOLD, 22));
+            tcm.getColumn(3).setMinWidth(0); // Sembunyikan Alamat jika terlalu sempit
             tcm.getColumn(3).setMaxWidth(0);
+            tcm.getColumn(3).setPreferredWidth(0);
         } else {
+            // Tampilan Layar Lebar
             title.setFont(new Font("Inter", Font.BOLD, 28));
-            tcm.getColumn(3).setMinWidth(100);
-            tcm.getColumn(3).setMaxWidth(5000);
-            tcm.getColumn(3).setPreferredWidth(200);
+            tcm.getColumn(3).setMinWidth(150);
+            tcm.getColumn(3).setMaxWidth(Integer.MAX_VALUE);
+            tcm.getColumn(3).setPreferredWidth(300);
         }
     }
 
@@ -133,7 +148,7 @@ public class PanelPelanggan extends JPanel {
         model.setRowCount(0);
         try {
             Connection conn = DBConfig.getConnection();
-            String sql = "SELECT id_pelanggan, nama_pelanggan, no_wa, alamat FROM pelanggan";
+            String sql = "SELECT id_pelanggan, nama_pelanggan, no_wa, alamat FROM pelanggan ORDER BY id_pelanggan DESC";
             ResultSet rs = conn.createStatement().executeQuery(sql);
 
             while (rs.next()) {
@@ -146,31 +161,20 @@ public class PanelPelanggan extends JPanel {
                 });
             }
         } catch (SQLException e) {
-            JOptionPane.showMessageDialog(this, "Gagal memuat: " + e.getMessage());
-        }
-    }
-
-    private void hubungiWA(int modelRow) {
-        String noWa = model.getValueAt(modelRow, 2).toString();
-        noWa = noWa.replaceAll("[^0-9]", "");
-        if (noWa.startsWith("0")) noWa = "62" + noWa.substring(1);
-
-        try {
-            String url = "https://wa.me/" + noWa + "?text=Halo%20Kak,%20kami%20dari%20Costume%20Rental...";
-            Desktop.getDesktop().browse(new URI(url));
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Gagal membuka WhatsApp: " + e.getMessage());
+            JOptionPane.showMessageDialog(this, "Gagal memuat data: " + e.getMessage());
         }
     }
 
     private void editPelanggan(int modelRow) {
         Object id = model.getValueAt(modelRow, 0);
-        JOptionPane.showMessageDialog(this, "Fitur Edit Pelanggan ID: " + id);
+        Object nama = model.getValueAt(modelRow, 1);
+        JOptionPane.showMessageDialog(this, "Edit data untuk: " + nama + " (ID: " + id + ")");
+        // Nanti panggil Form Edit di sini
     }
 
     private void hapusPelanggan(int modelRow) {
         Object id = model.getValueAt(modelRow, 0);
-        int confirm = JOptionPane.showConfirmDialog(this, "Hapus ID " + id + "?", "Hapus", JOptionPane.YES_NO_OPTION);
+        int confirm = JOptionPane.showConfirmDialog(this, "Hapus data pelanggan ID " + id + "?", "Konfirmasi Hapus", JOptionPane.YES_NO_OPTION);
         if (confirm == JOptionPane.YES_OPTION) {
             try {
                 Connection conn = DBConfig.getConnection();
@@ -178,19 +182,20 @@ public class PanelPelanggan extends JPanel {
                 pstmt.setObject(1, id);
                 pstmt.executeUpdate();
                 loadData();
-            } catch (SQLException e) { JOptionPane.showMessageDialog(this, e.getMessage()); }
+            } catch (SQLException e) { 
+                JOptionPane.showMessageDialog(this, "Gagal hapus: " + e.getMessage()); 
+            }
         }
     }
+
+    // ========== CLASS RENDERER & EDITOR UNTUK TOMBOL ==========
 
     class ActionRenderer extends JButton implements TableCellRenderer {
         public ActionRenderer() {
             setText("Aksi");
-            setFont(new Font("Inter", Font.PLAIN, 12));
-            setBackground(Color.WHITE);
-            setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(200, 200, 200), 1, true),
-                BorderFactory.createEmptyBorder(2, 8, 2, 8)
-            ));
+            setFont(new Font("Inter", Font.BOLD, 12));
+            setBackground(new Color(245, 245, 245));
+            setCursor(new Cursor(Cursor.HAND_CURSOR));
         }
         @Override
         public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
@@ -205,11 +210,20 @@ public class PanelPelanggan extends JPanel {
                 int viewRow = table.getSelectedRow();
                 if (viewRow != -1) {
                     int modelRow = table.convertRowIndexToModel(viewRow);
-                    String[] options = {"Hubungi WA", "Edit", "Hapus", "Batal"};
-                    int choice = JOptionPane.showOptionDialog(button, "Pilih aksi:", "Menu", 0, JOptionPane.PLAIN_MESSAGE, null, options, options[0]);
-                    if (choice == 0) hubungiWA(modelRow);
-                    else if (choice == 1) editPelanggan(modelRow);
-                    else if (choice == 2) hapusPelanggan(modelRow);
+                    
+                    // Opsi hanya Edit dan Hapus sesuai permintaan (Tanpa WA)
+                    String[] options = {"Edit Data", "Hapus Pelanggan", "Batal"};
+                    int choice = JOptionPane.showOptionDialog(
+                        button, 
+                        "Pilih tindakan untuk baris ini:", 
+                        "Menu Kelola", 
+                        JOptionPane.DEFAULT_OPTION, 
+                        JOptionPane.PLAIN_MESSAGE, 
+                        null, options, options[0]
+                    );
+                    
+                    if (choice == 0) editPelanggan(modelRow);
+                    else if (choice == 1) hapusPelanggan(modelRow);
                 }
                 fireEditingStopped();
             });
