@@ -82,5 +82,6 @@ public class PanelDashboard extends JPanel {
         card.add(lblTitle);
         
         return card;
+        
     }
 }

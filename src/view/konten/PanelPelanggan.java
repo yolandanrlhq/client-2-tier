@@ -37,18 +37,19 @@ public class PanelPelanggan extends JPanel {
 
         add(toolbar, "growx, wrap");
 
-        // ===== TABEL =====
-        String[] columns = {"ID", "Nama Pelanggan", "No WhatsApp", "Alamat"};
+        // ===== TABEL (TAMBAH KOLOM AKSI) =====
+        String[] columns = {"ID", "Nama Pelanggan", "No WhatsApp", "Alamat", "Aksi"};
 
         model = new DefaultTableModel(null, columns) {
             @Override
             public boolean isCellEditable(int row, int column) {
-                return false;
+                // Kolom Aksi (index 4) HARUS true agar tombol bisa diklik
+                return column == 4;
             }
         };
 
         table = new JTable(model);
-        table.setRowHeight(36);
+        table.setRowHeight(45); // Ditinggikan sedikit agar tombol proporsional
         table.setShowGrid(false);
         table.setIntercellSpacing(new Dimension(0, 0));
         table.setSelectionBackground(new Color(230, 245, 238));
@@ -61,10 +62,15 @@ public class PanelPelanggan extends JPanel {
         header.setForeground(Color.BLACK);
         header.setPreferredSize(new Dimension(header.getWidth(), 38));
 
-        // Column alignment
+        // Column alignment & Pasang Renderer/Editor
         DefaultTableCellRenderer center = new DefaultTableCellRenderer();
         center.setHorizontalAlignment(SwingConstants.CENTER);
         table.getColumnModel().getColumn(0).setCellRenderer(center);
+        
+        // --- PASANG AKSI DISINI ---
+        table.getColumnModel().getColumn(4).setCellRenderer(new ActionRenderer());
+        table.getColumnModel().getColumn(4).setCellEditor(new ActionEditor());
+        table.getColumnModel().getColumn(4).setPreferredWidth(100);
 
         // ScrollPane styling
         JScrollPane scroll = new JScrollPane(table);
@@ -76,7 +82,6 @@ public class PanelPelanggan extends JPanel {
 
     public void loadData() {
         model.setRowCount(0);
-
         try {
             Connection conn = DBConfig.getConnection();
             String sql = "SELECT id_pelanggan, nama_pelanggan, no_wa, alamat FROM pelanggan";
@@ -87,12 +92,66 @@ public class PanelPelanggan extends JPanel {
                     rs.getInt("id_pelanggan"),
                     rs.getString("nama_pelanggan"),
                     rs.getString("no_wa"),
-                    rs.getString("alamat")
+                    rs.getString("alamat"),
+                    "Aksi" // Isi string untuk kolom aksi
                 });
             }
-
         } catch (SQLException e) {
             JOptionPane.showMessageDialog(this, "Gagal load data: " + e.getMessage());
         }
+    }
+
+    // Fungsi Logika
+    private void editPelanggan(int row) {
+        String id = model.getValueAt(row, 0).toString();
+        JOptionPane.showMessageDialog(this, "Edit Pelanggan ID: " + id);
+    }
+
+    private void hapusPelanggan(int row) {
+        String id = model.getValueAt(row, 0).toString();
+        int tanya = JOptionPane.showConfirmDialog(this, "Hapus pelanggan ID " + id + "?", "Hapus", JOptionPane.YES_NO_OPTION);
+        if (tanya == JOptionPane.YES_OPTION) {
+            // Logika SQL Delete disini
+            loadData();
+        }
+    }
+
+    // ===== INNER CLASS RENDERER & EDITOR (Kodingan kamu) =====
+    class ActionRenderer extends JButton implements TableCellRenderer {
+        public ActionRenderer() {
+            setText("Aksi");
+            setMargin(new Insets(2, 2, 2, 2));
+            setBackground(Color.WHITE);
+            // Meniru style gambar pertama
+            setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(Color.LIGHT_GRAY, 1, true),
+                BorderFactory.createEmptyBorder(2, 5, 2, 5)
+            ));
+        }
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+            return this;
+        }
+    }
+
+    class ActionEditor extends AbstractCellEditor implements TableCellEditor {
+        private final JButton button = new JButton("Aksi");
+        public ActionEditor() {
+            button.setMargin(new Insets(2, 2, 2, 2));
+            button.addActionListener(e -> {
+                int row = table.getSelectedRow();
+                if (row != -1) {
+                    String[] opsi = {"Edit", "Hapus"};
+                    int pilih = JOptionPane.showOptionDialog(table, "Pilih aksi:", "Menu", 0, JOptionPane.PLAIN_MESSAGE, null, opsi, opsi[0]);
+                    if (pilih == 0) editPelanggan(row);
+                    else if (pilih == 1) hapusPelanggan(row);
+                }
+                fireEditingStopped();
+            });
+        }
+        @Override
+        public Component getTableCellEditorComponent(JTable t, Object v, boolean isS, int r, int c) { return button; }
+        @Override
+        public Object getCellEditorValue() { return null; }
     }
 }
