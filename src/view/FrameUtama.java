@@ -15,7 +15,6 @@ import net.miginfocom.swing.MigLayout;
 // Import semua panel konten
 import view.konten.*;
 import view.menu.PanelMenu;
-import view.menu.PanelMenuItem;
 
 public class FrameUtama extends JFrame {
 
@@ -27,6 +26,7 @@ public class FrameUtama extends JFrame {
     private PanelDashboard pDashboard;
     private PanelProduk pProduk;
     private PanelPesanan pPesanan;
+    private PanelPelanggan pPelanggan; // 🔹 TAMBAHAN
 
     public FrameUtama() {
         initializeUI();
@@ -40,7 +40,6 @@ public class FrameUtama extends JFrame {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setPreferredSize(new Dimension(1280, 720));
         setMinimumSize(new Dimension(1100, 650));
-        // Mengatur layout utama: Sidebar (280px) dan Konten (Sisa ruang)
         setLayout(new MigLayout("fill, insets 0, gap 0", "[280!]0[grow]", "[grow]"));
     }
 
@@ -49,38 +48,52 @@ public class FrameUtama extends JFrame {
         panelKonten = new JPanel(cardLayout);
         panelKonten.setBackground(Color.WHITE);
 
-        // Inisialisasi panel-panel
+        // Inisialisasi panel
         pDashboard = new PanelDashboard();
         pProduk = new PanelProduk();
         pPesanan = new PanelPesanan();
-        
-        // Daftarkan ke CardLayout dengan Key
+        pPelanggan = new PanelPelanggan(); // 🔹 TAMBAHAN
+
+        // DASHBOARD
         panelKonten.add(pDashboard, "dashboard");
+
+        // PRODUK
         panelKonten.add(pProduk, "produk");
         panelKonten.add(new PanelAddProduk(), "add_produk");
+
+        // PESANAN
         panelKonten.add(pPesanan, "pesanan");
         panelKonten.add(new PanelAddPesanan(), "add_pesanan");
+
+        // PELANGGAN (SAMA SEPERTI PRODUK)
+        panelKonten.add(pPelanggan, "pelanggan");
+        panelKonten.add(new PanelAddPelanggan(), "add_pelanggan");
     }
 
     private void setupPanelMenu() {
         List<MenuItem> listMenu = new ArrayList<>();
 
-        // Menu Dashboard
+        // DASHBOARD
         listMenu.add(new MenuItem("Dashboard", "dashboard"));
 
-        // Menu Produk dengan Sub-Menu
+        // PRODUK
         MenuItem menuProduk = new MenuItem("Produk");
         menuProduk.addSubMenuItem(new MenuItem("Daftar Kostum", "produk"));
         menuProduk.addSubMenuItem(new MenuItem("Tambah Kostum", "add_produk"));
         listMenu.add(menuProduk);
 
-        // Menu Pesanan dengan Sub-Menu
+        // PESANAN
         MenuItem menuPesanan = new MenuItem("Pesanan");
         menuPesanan.addSubMenuItem(new MenuItem("Data Pesanan", "pesanan"));
         menuPesanan.addSubMenuItem(new MenuItem("Tambah Pesanan", "add_pesanan"));
         listMenu.add(menuPesanan);
 
-        // Buat sidebar menu
+        // 🔹 PELANGGAN (IDENTIK DENGAN PRODUK)
+        MenuItem menuPelanggan = new MenuItem("Pelanggan");
+        menuPelanggan.addSubMenuItem(new MenuItem("Daftar Pelanggan", "pelanggan"));
+        menuPelanggan.addSubMenuItem(new MenuItem("Tambah Pelanggan", "add_pelanggan"));
+        listMenu.add(menuPelanggan);
+
         panelMenu = new PanelMenu(listMenu, cardLayout, panelKonten);
     }
 
@@ -90,8 +103,7 @@ public class FrameUtama extends JFrame {
     }
 
     /**
-     * Fungsi krusial untuk refresh data saat menu diklik
-     * Pastikan di PanelMenu.java, fungsi ini dipanggil
+     * Refresh data saat menu diklik
      */
     public void refreshPanel(String key) {
         switch (key) {
@@ -104,25 +116,27 @@ public class FrameUtama extends JFrame {
             case "pesanan":
                 pPesanan.loadData();
                 break;
+            case "pelanggan":
+                pPelanggan.loadData();
+                break;
         }
     }
 
-    // Contoh logika di FrameUtama saat menu diklik
     public void gantiPanel(String key) {
         cardLayout.show(panelKonten, key);
-        
-        // Jika panel yang dibuka adalah produk atau pesanan, panggil loadData-nya
+
         if (key.equals("produk")) {
-            pProduk.loadData(); 
+            pProduk.loadData();
         } else if (key.equals("pesanan")) {
             pPesanan.loadData();
+        } else if (key.equals("pelanggan")) {
+            pPelanggan.loadData();
         } else if (key.equals("dashboard")) {
             pDashboard.refreshData();
         }
     }
 
     public static void main(String[] args) {
-        // Jalankan aplikasi dengan tema FlatLaf (pastikan library sudah terpasang)
         SwingUtilities.invokeLater(() -> {
             try {
                 com.formdev.flatlaf.FlatLightLaf.setup();
