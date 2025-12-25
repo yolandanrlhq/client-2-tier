@@ -12,14 +12,14 @@ public class PanelPesanan extends JPanel {
 
     private JTable table;
     private DefaultTableModel model;
+    private JTextField txtSearch; // Tambahan Fitur Search
     private JLabel title;
     private MigLayout mainLayout;
 
     public PanelPesanan() {
         initializeUI();
-        loadData();
+        loadData(""); // Panggil dengan string kosong untuk load awal
 
-        // Listener untuk deteksi perubahan ukuran layar (Responsive Table)
         this.addComponentListener(new ComponentAdapter() {
             @Override
             public void componentResized(ComponentEvent e) {
@@ -29,18 +29,38 @@ public class PanelPesanan extends JPanel {
     }
 
     private void initializeUI() {
-        mainLayout = new MigLayout("fill, insets 30", "[grow]", "[]20[grow]");
+        // Mengubah layout agar menampung toolbar pencarian
+        mainLayout = new MigLayout("fill, insets 30", "[grow]", "[]15[]20[grow]");
         setLayout(mainLayout);
         setBackground(Color.WHITE);
 
         title = new JLabel("Daftar Transaksi Sewa");
         title.setFont(new Font("Inter", Font.BOLD, 28));
-        add(title, "split 2, growx");
+        add(title, "wrap");
+
+        // ===== TOOLBAR PENCARIAN & REFRESH =====
+        JPanel toolbar = new JPanel(new MigLayout("insets 0", "[grow]10[]10[]"));
+        toolbar.setOpaque(false);
+
+        txtSearch = new JTextField();
+        txtSearch.putClientProperty("JTextField.placeholderText", "Cari ID Sewa / Nama Penyewa / Kostum...");
+        txtSearch.addActionListener(e -> loadData(txtSearch.getText().trim()));
+
+        JButton btnSearch = new JButton("Cari");
+        btnSearch.addActionListener(e -> loadData(txtSearch.getText().trim()));
 
         JButton btnRefresh = new JButton("Refresh Data");
         btnRefresh.setBackground(new Color(245, 245, 245));
-        btnRefresh.addActionListener(e -> loadData());
-        add(btnRefresh, "right, wrap");
+        btnRefresh.addActionListener(e -> {
+            txtSearch.setText("");
+            loadData("");
+        });
+
+        toolbar.add(txtSearch, "growx, h 35!");
+        toolbar.add(btnSearch, "w 80!, h 35!");
+        toolbar.add(btnRefresh, "w 120!, h 35!");
+
+        add(toolbar, "growx, wrap");
 
         String[] columns = {"ID Sewa", "Penyewa", "Kostum", "Jumlah", "Tgl Pinjam", "Total", "Status", "Aksi"};
         model = new DefaultTableModel(null, columns) {
@@ -55,6 +75,9 @@ public class PanelPesanan extends JPanel {
         table.getTableHeader().setFont(new Font("Inter", Font.BOLD, 12));
         table.getTableHeader().setBackground(new Color(250, 250, 250));
         
+        // Memasang Zebra Renderer (Warna baris selang-seling)
+        table.setDefaultRenderer(Object.class, new ZebraRenderer());
+
         // Memasang Renderer dan Editor pada kolom Aksi
         table.getColumn("Aksi").setCellRenderer(new ActionRenderer());
         table.getColumn("Aksi").setCellEditor(new ActionEditor());
@@ -64,75 +87,31 @@ public class PanelPesanan extends JPanel {
         add(scrollPane, "grow");
     }
 
-    private void applyTableResponsiveness() {
-        Window window = SwingUtilities.getWindowAncestor(this);
-if (window == null) return;
-
-int w = window.getWidth();
-
-        if (w <= 0) return;
-
-        TableColumnModel tcm = table.getColumnModel();
-
-        // ================= SPLIT VIEW =================
-        if (w <= 768) {
-            mainLayout.setLayoutConstraints("fill, insets 15");
-            title.setFont(new Font("Inter", Font.BOLD, 20));
-
-            // Kolom penting saja
-            hideColumn(tcm, 3); // Jumlah
-            hideColumn(tcm, 4); // Tgl Pinjam
-            hideColumn(tcm, 5); // Total
-
-            setColumnWidth(tcm, 0, 70);  // ID
-            setColumnWidth(tcm, 1, 120); // Penyewa
-            setColumnWidth(tcm, 2, 120); // Kostum
-            setColumnWidth(tcm, 6, 90);  // Status
-            setColumnWidth(tcm, 7, 70);  // Aksi
-
-        // ================= DESKTOP SMALL =================
-        } else if (w <= 1200) {
-            mainLayout.setLayoutConstraints("fill, insets 30 4% 30 4%");
-            title.setFont(new Font("Inter", Font.BOLD, 24));
-
-            showColumn(tcm, 3, 60);   // Jumlah
-            showColumn(tcm, 4, 110);  // Tanggal
-            hideColumn(tcm, 5);       // Total (masih disembunyikan)
-
-            setColumnWidth(tcm, 6, 100);
-            setColumnWidth(tcm, 7, 80);
-
-        // ================= DESKTOP STANDARD =================
-        } else {
-            // 1200 – 1400 (1366 optimal)
-            mainLayout.setLayoutConstraints("fill, insets 40 6% 40 6%");
-            title.setFont(new Font("Inter", Font.BOLD, 32));
-
-            showColumn(tcm, 3, 70);   // Jumlah
-            showColumn(tcm, 4, 130);  // Tanggal
-            showColumn(tcm, 5, 120);  // Total
-
-            setColumnWidth(tcm, 6, 110);
-            setColumnWidth(tcm, 7, 90);
-        }
-
-        this.revalidate();
-    }
-
-    // Helper untuk mengubah lebar kolom secara dinamis
-    private void setColumnWidth(TableColumnModel tcm, int index, int width) {
-        tcm.getColumn(index).setMinWidth(width);
-        tcm.getColumn(index).setMaxWidth(width == 0 ? 0 : 1000);
-        tcm.getColumn(index).setPreferredWidth(width);
-    }
-
+    // Perbaikan loadData agar mendukung pencarian
     public void loadData() {
+        loadData("");
+    }
+
+    public void loadData(String keyword) {
         model.setRowCount(0);
-        try {
-            Connection conn = DBConfig.getConnection();
-            String sql = "SELECT p.*, k.nama_kostum FROM pesanan p " +
-                         "JOIN kostum k ON p.id_kostum = k.id_kostum ORDER BY p.tgl_pinjam DESC";
-            ResultSet res = conn.createStatement().executeQuery(sql);
+        String sql = """
+            SELECT p.*, k.nama_kostum 
+            FROM pesanan p 
+            JOIN kostum k ON p.id_kostum = k.id_kostum 
+            WHERE p.id_sewa LIKE ? OR p.nama_penyewa LIKE ? OR k.nama_kostum LIKE ?
+            ORDER BY p.tgl_pinjam DESC
+        """;
+
+        // Menggunakan try-with-resources agar koneksi otomatis tertutup (Anti-Error)
+        try (Connection conn = DBConfig.getConnection();
+             PreparedStatement pst = conn.prepareStatement(sql)) {
+            
+            String key = "%" + keyword + "%";
+            pst.setString(1, key);
+            pst.setString(2, key);
+            pst.setString(3, key);
+            
+            ResultSet res = pst.executeQuery();
             while (res.next()) {
                 model.addRow(new Object[]{
                     res.getString("id_sewa"),
@@ -150,7 +129,7 @@ int w = window.getWidth();
         }
     }
 
-    // --- LOGIKA EDIT & HAPUS (Tetap Sama dengan kode Anda) ---
+    // --- LOGIKA EDIT MILIKMU (UTUH TANPA PERUBAHAN FITUR) ---
     private void editPesanan(int row) {
         String idSewa = model.getValueAt(row, 0).toString();
         String namaKostumLama = model.getValueAt(row, 2).toString();
@@ -164,8 +143,7 @@ int w = window.getWidth();
         cbKostum.addItem(namaKostumLama);
         
         String idKostumLama = "";
-        try {
-            Connection conn = DBConfig.getConnection();
+        try (Connection conn = DBConfig.getConnection()) {
             PreparedStatement pst = conn.prepareStatement("SELECT id_kostum FROM pesanan WHERE id_sewa=?");
             pst.setString(1, idSewa);
             ResultSet rs = pst.executeQuery();
@@ -185,8 +163,7 @@ int w = window.getWidth();
 
         int ok = JOptionPane.showConfirmDialog(this, form, "Edit Transaksi", JOptionPane.OK_CANCEL_OPTION);
         if (ok == JOptionPane.OK_OPTION) {
-            try {
-                Connection conn = DBConfig.getConnection();
+            try (Connection conn = DBConfig.getConnection()) {
                 String idKostumBaru = idKostumLama;
                 String selectedK = cbKostum.getSelectedItem().toString();
                 if (selectedK.contains(" - ")) idKostumBaru = selectedK.split(" - ")[0];
@@ -215,29 +192,89 @@ int w = window.getWidth();
                 if (!cbStatus.getSelectedItem().toString().equals("Disewa")) {
                     conn.createStatement().executeUpdate("UPDATE kostum SET status='Tersedia' WHERE id_kostum='" + idKostumBaru + "'");
                 }
-                loadData();
+                loadData("");
             } catch (SQLException ex) { JOptionPane.showMessageDialog(this, ex.getMessage()); }
         }
     }
 
+    // --- LOGIKA HAPUS MILIKMU ---
     private void hapusPesanan(int row) {
         String id = model.getValueAt(row, 0).toString();
         int ok = JOptionPane.showConfirmDialog(this, "Hapus transaksi ini?", "Konfirmasi", JOptionPane.YES_NO_OPTION);
         if (ok == JOptionPane.YES_OPTION) {
-            try {
-                Connection conn = DBConfig.getConnection();
+            try (Connection conn = DBConfig.getConnection()) {
                 ResultSet rs = conn.createStatement().executeQuery("SELECT id_kostum FROM pesanan WHERE id_sewa='"+id+"'");
                 if(rs.next()) conn.createStatement().executeUpdate("UPDATE kostum SET status='Tersedia' WHERE id_kostum='"+rs.getString("id_kostum")+"'");
                 
                 PreparedStatement pst = conn.prepareStatement("DELETE FROM pesanan WHERE id_sewa=?");
                 pst.setString(1, id);
                 pst.executeUpdate();
-                loadData();
+                loadData("");
             } catch (SQLException e) { JOptionPane.showMessageDialog(this, e.getMessage()); }
         }
     }
 
-    // --- RENDERER & EDITOR (Tetap Sama) ---
+    // --- LOGIKA RESPONSIVE MILIKMU ---
+    private void applyTableResponsiveness() {
+        Window window = SwingUtilities.getWindowAncestor(this);
+        if (window == null) return;
+        int w = window.getWidth();
+        if (w <= 0) return;
+        TableColumnModel tcm = table.getColumnModel();
+
+        if (w <= 768) {
+            mainLayout.setLayoutConstraints("fill, insets 15");
+            title.setFont(new Font("Inter", Font.BOLD, 20));
+            hideColumn(tcm, 3); hideColumn(tcm, 4); hideColumn(tcm, 5);
+            setColumnWidth(tcm, 0, 70); setColumnWidth(tcm, 1, 120); setColumnWidth(tcm, 2, 120);
+            setColumnWidth(tcm, 6, 90); setColumnWidth(tcm, 7, 70);
+        } else if (w <= 1200) {
+            mainLayout.setLayoutConstraints("fill, insets 30 4% 30 4%");
+            title.setFont(new Font("Inter", Font.BOLD, 24));
+            showColumn(tcm, 3, 60); showColumn(tcm, 4, 110); hideColumn(tcm, 5);
+            setColumnWidth(tcm, 6, 100); setColumnWidth(tcm, 7, 80);
+        } else {
+            mainLayout.setLayoutConstraints("fill, insets 40 6% 40 6%");
+            title.setFont(new Font("Inter", Font.BOLD, 32));
+            showColumn(tcm, 3, 70); showColumn(tcm, 4, 130); showColumn(tcm, 5, 120);
+            setColumnWidth(tcm, 6, 110); setColumnWidth(tcm, 7, 90);
+        }
+        this.revalidate();
+    }
+
+    private void setColumnWidth(TableColumnModel tcm, int index, int width) {
+        tcm.getColumn(index).setMinWidth(width);
+        tcm.getColumn(index).setMaxWidth(width == 0 ? 0 : 1000);
+        tcm.getColumn(index).setPreferredWidth(width);
+    }
+
+    private void hideColumn(TableColumnModel tcm, int index) {
+        tcm.getColumn(index).setMinWidth(0);
+        tcm.getColumn(index).setMaxWidth(0);
+        tcm.getColumn(index).setPreferredWidth(0);
+    }
+
+    private void showColumn(TableColumnModel tcm, int index, int width) {
+        tcm.getColumn(index).setMinWidth(50);
+        tcm.getColumn(index).setMaxWidth(1000);
+        tcm.getColumn(index).setPreferredWidth(width);
+    }
+
+    // --- TAMBAHAN: ZEBRA RENDERER ---
+    class ZebraRenderer extends DefaultTableCellRenderer {
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+            super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            if (isSelected) {
+                setBackground(new Color(200, 220, 255));
+            } else {
+                setBackground(row % 2 == 0 ? Color.WHITE : new Color(245, 248, 250));
+            }
+            return this;
+        }
+    }
+
+    // --- RENDERER & EDITOR TOMBOL AKSI ---
     class ActionRenderer extends JButton implements TableCellRenderer {
         public ActionRenderer() {
             setText("Aksi");
@@ -271,17 +308,4 @@ int w = window.getWidth();
         @Override
         public Object getCellEditorValue() { return null; }
     }
-
-    private void hideColumn(TableColumnModel tcm, int index) {
-        tcm.getColumn(index).setMinWidth(0);
-        tcm.getColumn(index).setMaxWidth(0);
-        tcm.getColumn(index).setPreferredWidth(0);
-    }
-
-    private void showColumn(TableColumnModel tcm, int index, int width) {
-        tcm.getColumn(index).setMinWidth(50);
-        tcm.getColumn(index).setMaxWidth(1000);
-        tcm.getColumn(index).setPreferredWidth(width);
-    }
-
 }
