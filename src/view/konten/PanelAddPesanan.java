@@ -3,24 +3,34 @@ package view.konten;
 import java.awt.*;
 import java.sql.*;
 import javax.swing.*;
-import javax.swing.event.ChangeEvent;
-import javax.swing.event.ChangeListener;
 import net.miginfocom.swing.MigLayout;
 import config.DBConfig;
 
 public class PanelAddPesanan extends JPanel {
+
     private JTextField txtIDSewa, txtPenyewa, txtTotal;
     private JComboBox<String> cbKostum;
     private JSpinner txtJumlah;
-    private double hargaPerUnit = 0; // Untuk menyimpan harga kostum yang dipilih
+    private double hargaPerUnit = 0;
 
     public PanelAddPesanan() {
         initializeUI();
+        // loadKostumCombo() TIDAK dipanggil di constructor
+    }
+
+    // AUTO REFRESH setiap panel ditampilkan oleh CardLayout
+    @Override
+    public void addNotify() {
+        super.addNotify();
         loadKostumCombo();
     }
 
     private void initializeUI() {
-        setLayout(new MigLayout("insets 40", "[right]20[grow, fill]", "[]30[]15[]15[]15[]15[]15[]30[]"));
+        setLayout(new MigLayout(
+            "insets 40",
+            "[right]20[grow, fill]",
+            "[]30[]15[]15[]15[]15[]15[]30[]"
+        ));
         setBackground(Color.WHITE);
 
         JLabel title = new JLabel("Tambah Pesanan Baru");
@@ -37,20 +47,18 @@ public class PanelAddPesanan extends JPanel {
 
         add(new JLabel("Pilih Kostum:"));
         cbKostum = new JComboBox<>();
-        cbKostum.addItem("-- Pilih Kostum --");
-        // Listener saat kostum dipilih (ambil harga)
+        cbKostum.setMaximumRowCount(10); // ⭐ INI KUNCI SCROLL DROPDOWN
         cbKostum.addActionListener(e -> ambilHargaKostum());
         add(cbKostum, "wrap");
 
         add(new JLabel("Jumlah:"));
         txtJumlah = new JSpinner(new SpinnerNumberModel(1, 1, 100, 1));
-        // Listener saat jumlah berubah (hitung total)
         txtJumlah.addChangeListener(e -> hitungTotal());
         add(txtJumlah, "w 60!, wrap");
 
         add(new JLabel("Total Biaya (Rp):"));
         txtTotal = new JTextField();
-        txtTotal.setEditable(false); // Biar dihitung sistem, bukan diketik user
+        txtTotal.setEditable(false);
         txtTotal.setBackground(new Color(245, 245, 245));
         add(txtTotal, "wrap");
 
@@ -61,46 +69,58 @@ public class PanelAddPesanan extends JPanel {
         add(btnSimpan, "span 2, center, w 200!, h 45!");
     }
 
+    // =========================
+    // LOAD KOSTUM (HANYA TERSEDIA)
+    // =========================
     private void loadKostumCombo() {
+        cbKostum.removeAllItems();
+        cbKostum.addItem("-- Pilih Kostum --");
+
         try {
             Connection conn = DBConfig.getConnection();
-            String sql = "SELECT id_kostum, nama_kostum FROM kostum WHERE status = 'Tersedia'";
+            String sql = "SELECT id_kostum, nama_kostum FROM kostum WHERE status='Tersedia'";
             ResultSet res = conn.createStatement().executeQuery(sql);
-            while(res.next()) {
-                cbKostum.addItem(res.getString("id_kostum") + " - " + res.getString("nama_kostum"));
+
+            while (res.next()) {
+                cbKostum.addItem(
+                    res.getString("id_kostum") + " - " + res.getString("nama_kostum")
+                );
             }
-        } catch (SQLException e) { e.printStackTrace(); }
+
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(this, e.getMessage());
+        }
     }
 
     private void ambilHargaKostum() {
-        String selected = cbKostum.getSelectedItem().toString();
-        if (selected.equals("-- Pilih Kostum --")) {
+        if (cbKostum.getSelectedIndex() == 0) {
             hargaPerUnit = 0;
             hitungTotal();
             return;
         }
-        
-        String idKostum = selected.split(" - ")[0];
+
+        String idKostum = cbKostum.getSelectedItem().toString().split(" - ")[0];
+
         try {
             Connection conn = DBConfig.getConnection();
-            String sql = "SELECT harga_sewa FROM kostum WHERE id_kostum = ?";
-            PreparedStatement pst = conn.prepareStatement(sql);
+            PreparedStatement pst = conn.prepareStatement(
+                "SELECT harga_sewa FROM kostum WHERE id_kostum=?"
+            );
             pst.setString(1, idKostum);
             ResultSet res = pst.executeQuery();
             if (res.next()) {
                 hargaPerUnit = res.getDouble("harga_sewa");
             }
             hitungTotal();
-        } catch (SQLException e) { e.printStackTrace(); }
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(this, e.getMessage());
+        }
     }
 
-    // Di PanelAddPesanan.java
     private void hitungTotal() {
         int jumlah = (int) txtJumlah.getValue();
-        double total = hargaPerUnit * jumlah; 
-        
-        // Set teks ke TextField tanpa menghilangkan nol-nya
-        txtTotal.setText(String.format("%.0f", total)); 
+        double total = hargaPerUnit * jumlah;
+        txtTotal.setText(String.format("%.0f", total));
     }
 
     private void simpanPesanan() {
@@ -111,25 +131,29 @@ public class PanelAddPesanan extends JPanel {
 
         try {
             Connection conn = DBConfig.getConnection();
-            String sql = "INSERT INTO pesanan (id_sewa, nama_penyewa, id_kostum, jumlah, total_biaya, status, tgl_pinjam) VALUES (?, ?, ?, ?, ?, ?, CURDATE())";
-            PreparedStatement pst = conn.prepareStatement(sql);
-            
             String idKostum = cbKostum.getSelectedItem().toString().split(" - ")[0];
+
+            PreparedStatement pst = conn.prepareStatement(
+                "INSERT INTO pesanan " +
+                "(id_sewa, nama_penyewa, id_kostum, jumlah, total_biaya, status, tgl_pinjam) " +
+                "VALUES (?, ?, ?, ?, ?, 'Disewa', CURDATE())"
+            );
 
             pst.setString(1, txtIDSewa.getText());
             pst.setString(2, txtPenyewa.getText());
             pst.setString(3, idKostum);
             pst.setInt(4, (int) txtJumlah.getValue());
             pst.setDouble(5, Double.parseDouble(txtTotal.getText()));
-            pst.setString(6, "Disewa");
-
             pst.executeUpdate();
-            
-            // Update status kostum jadi 'Disewa'
-            conn.createStatement().executeUpdate("UPDATE kostum SET status='Disewa' WHERE id_kostum='" + idKostum + "'");
-            
+
+            // Update status kostum
+            conn.createStatement().executeUpdate(
+                "UPDATE kostum SET status='Disewa' WHERE id_kostum='" + idKostum + "'"
+            );
+
             JOptionPane.showMessageDialog(this, "Sewa Berhasil Disimpan!");
             resetForm();
+
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "Gagal: " + e.getMessage());
         }
@@ -138,8 +162,8 @@ public class PanelAddPesanan extends JPanel {
     private void resetForm() {
         txtIDSewa.setText("");
         txtPenyewa.setText("");
-        cbKostum.setSelectedIndex(0);
         txtJumlah.setValue(1);
         txtTotal.setText("");
+        cbKostum.setSelectedIndex(0);
     }
 }
