@@ -18,16 +18,9 @@ public class PanelAddProduk extends JPanel {
     }
 
     private void initializeUI() {
-
-        /*
-         * RESPONSIVE STRATEGY (MigLayout):
-         * - wrap 2  → desktop besar = 2 kolom
-         * - span 2  → otomatis turun ke 1 kolom saat sempit
-         * - growx   → input melebar mengikuti layar
-         */
         setLayout(new MigLayout(
             "fillx, insets 40, wrap 2",
-            "[right, 120!]15[grow, fill]",
+            "[right,120!]15[grow,fill]",
             "[]25[]15[]15[]15[]15[]15[]25[]"
         ));
         setBackground(Color.WHITE);
@@ -36,7 +29,6 @@ public class PanelAddProduk extends JPanel {
         title.setFont(new Font("Inter", Font.BOLD, 28));
         add(title, "span 2, center, wrap");
 
-        // ================= FORM =================
         add(new JLabel("ID Kostum:"));
         txtID = new JTextField();
         add(txtID, "growx");
@@ -65,30 +57,53 @@ public class PanelAddProduk extends JPanel {
         txtHarga = new JTextField();
         add(txtHarga, "growx");
 
-        // ================= BUTTON =================
         JButton btnSimpan = new JButton("Simpan ke Katalog");
-        btnSimpan.setBackground(new Color(131, 188, 160));
+        btnSimpan.setBackground(new Color(131,188,160));
         btnSimpan.setForeground(Color.WHITE);
         btnSimpan.setFocusPainted(false);
 
-        btnSimpan.addActionListener(e -> simpanDataAsync(btnSimpan));
-
+        btnSimpan.addActionListener(e -> simpanAsync(btnSimpan));
         add(btnSimpan, "span 2, center, w 240!, h 45!");
     }
 
     // =========================
-    // SIMPAN DATA (NON FREEZE)
+    // SIMPAN DATA + PROGRESS %
     // =========================
-    private void simpanDataAsync(JButton btn) {
+    private void simpanAsync(JButton btn) {
 
-        JDialog loading = createLoadingDialog();
+        JDialog dialog = new JDialog(
+            SwingUtilities.getWindowAncestor(this),
+            "Memproses...",
+            Dialog.ModalityType.MODELESS   // 🔥 penting: TIDAK MEMBLOK UI
+        );
+
+        JProgressBar bar = new JProgressBar(0, 100);
+        bar.setStringPainted(true);
+
+        JLabel lbl = new JLabel("Menyimpan data...");
+        lbl.setFont(new Font("Inter", Font.PLAIN, 14));
+
+        JPanel panel = new JPanel(new BorderLayout(10,10));
+        panel.setBorder(BorderFactory.createEmptyBorder(20,20,20,20));
+        panel.add(lbl, BorderLayout.NORTH);
+        panel.add(bar, BorderLayout.CENTER);
+
+        dialog.setContentPane(panel);
+        dialog.pack();
+        dialog.setLocationRelativeTo(this);
 
         SwingWorker<Void, Void> worker = new SwingWorker<>() {
 
             @Override
             protected Void doInBackground() throws Exception {
-                Thread.sleep(2000); // simulasi proses
 
+                // ===== SIMULASI PROSES 5 DETIK =====
+                for (int i = 0; i <= 100; i += 5) {
+                    Thread.sleep(250); // 5 detik total
+                    setProgress(i);
+                }
+
+                // ===== SIMPAN DATABASE =====
                 Connection conn = DBConfig.getConnection();
                 String sql = """
                     INSERT INTO kostum
@@ -110,7 +125,7 @@ public class PanelAddProduk extends JPanel {
 
             @Override
             protected void done() {
-                loading.dispose();
+                dialog.dispose();
                 btn.setEnabled(true);
 
                 try {
@@ -123,44 +138,21 @@ public class PanelAddProduk extends JPanel {
                 } catch (Exception ex) {
                     JOptionPane.showMessageDialog(
                         PanelAddProduk.this,
-                        "Gagal simpan: " + ex.getMessage()
+                        "Gagal: " + ex.getMessage()
                     );
                 }
             }
         };
 
+        worker.addPropertyChangeListener(evt -> {
+            if ("progress".equals(evt.getPropertyName())) {
+                bar.setValue((Integer) evt.getNewValue());
+            }
+        });
+
         btn.setEnabled(false);
         worker.execute();
-        loading.setVisible(true);
-    }
-
-    // =========================
-    // LOADING DIALOG
-    // =========================
-    private JDialog createLoadingDialog() {
-        JDialog dialog = new JDialog(
-            SwingUtilities.getWindowAncestor(this),
-            "Memproses...",
-            Dialog.ModalityType.APPLICATION_MODAL
-        );
-
-        JProgressBar bar = new JProgressBar();
-        bar.setIndeterminate(true);
-
-        JLabel lbl = new JLabel("Menyimpan data, mohon tunggu...");
-        lbl.setFont(new Font("Inter", Font.PLAIN, 14));
-
-        JPanel p = new JPanel(new BorderLayout(10, 10));
-        p.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
-        p.add(lbl, BorderLayout.NORTH);
-        p.add(bar, BorderLayout.CENTER);
-
-        dialog.setContentPane(p);
-        dialog.pack();
-        dialog.setLocationRelativeTo(this);
-        dialog.setResizable(false);
-
-        return dialog;
+        dialog.setVisible(true);
     }
 
     private void resetForm() {
