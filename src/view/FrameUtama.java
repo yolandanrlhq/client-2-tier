@@ -63,8 +63,16 @@ public class FrameUtama extends JFrame {
         btnHamburgerOverlay.setBorder(BorderFactory.createLineBorder(new Color(230, 230, 230)));
 
         btnHamburgerOverlay.addActionListener(e -> toggleMenu());
+<<<<<<< HEAD
 
         layeredPane.add(btnHamburgerOverlay, JLayeredPane.DRAG_LAYER);
+=======
+        
+        // Gunakan DRAG_LAYER agar selalu di depan konten, tapi di bawah sidebar jika diperlukan
+        getLayeredPane().add(btnHamburgerOverlay, JLayeredPane.DRAG_LAYER);
+        btnHamburgerOverlay.setBounds(15, 25, 50, 45);
+        btnHamburgerOverlay.setVisible(false);
+>>>>>>> cb777f024bac9a8688f6d01da05ed6433c493d3a
     }
 
     // =========================
@@ -165,11 +173,23 @@ public class FrameUtama extends JFrame {
             btnHamburgerOverlay.setVisible(false);
             isMenuShow = true;
         }
+<<<<<<< HEAD
 
         btnHamburgerOverlay.setBounds(15, 15, 50, 45);
 
         layeredPane.revalidate();
         layeredPane.repaint();
+=======
+        
+        btnHamburgerOverlay.putClientProperty("JButton.arc", 15);
+        btnHamburgerOverlay.putClientProperty("JButton.focusWidth", 0);
+        // Jaga posisi tombol hamburger di pojok kiri atas
+        btnHamburgerOverlay.setBounds(15, 30, 40, 40);
+        
+        // Refresh tampilan secara paksa
+        revalidate();
+        repaint();
+>>>>>>> cb777f024bac9a8688f6d01da05ed6433c493d3a
     }
 
     // =========================

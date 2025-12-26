@@ -1,37 +1,49 @@
 package model;
+
 import java.util.Date;
 
 public class Pesanan {
-    private String idSewa, namaPenyewa, idKostum, status;
-    private String namaKostum; // Atribut tambahan untuk mempermudah Join di View
+
+    private String idSewa;
+    private String namaPenyewa;
+
+    // WAJIB ADA (FK)
+    private String idKostum;
+
+    // SNAPSHOT NAMA KOSTUM (BIAR TIDAK HILANG DI TABEL)
+    private String namaKostum;
+
     private int jumlah;
     private double totalBiaya;
+    private String status;
     private Date tglPinjam;
 
     public Pesanan() {}
-    
-    public String getIdSewa() { 
-        return idSewa; 
-    }
-    
-    public void setIdSewa(String idSewa) { 
-        this.idSewa = idSewa; 
+
+    // ================= GETTER & SETTER =================
+
+    public String getIdSewa() {
+        return idSewa;
     }
 
-    public String getNamaPenyewa() { 
-        return namaPenyewa; 
+    public void setIdSewa(String idSewa) {
+        this.idSewa = idSewa;
     }
 
-    public void setNamaPenyewa(String namaPenyewa) { 
-        this.namaPenyewa = namaPenyewa; 
+    public String getNamaPenyewa() {
+        return namaPenyewa;
     }
 
-    public String getIdKostum() { 
-        return idKostum; 
+    public void setNamaPenyewa(String namaPenyewa) {
+        this.namaPenyewa = namaPenyewa;
     }
 
-    public void setIdKostum(String idKostum) { 
-        this.idKostum = idKostum; 
+    public String getIdKostum() {
+        return idKostum;
+    }
+
+    public void setIdKostum(String idKostum) {
+        this.idKostum = idKostum;
     }
 
     public String getNamaKostum() {
@@ -42,40 +54,47 @@ public class Pesanan {
         this.namaKostum = namaKostum;
     }
 
-    public int getJumlah() { 
-        return jumlah; 
+    public int getJumlah() {
+        return jumlah;
     }
 
-    public void setJumlah(int jumlah) { 
-        this.jumlah = jumlah; 
+    public void setJumlah(int jumlah) {
+        this.jumlah = jumlah;
     }
 
-    public double getTotalBiaya() { 
-        return totalBiaya; 
+    public double getTotalBiaya() {
+        return totalBiaya;
     }
 
-    public void setTotalBiaya(double totalBiaya) { 
-        this.totalBiaya = totalBiaya; 
+    public void setTotalBiaya(double totalBiaya) {
+        this.totalBiaya = totalBiaya;
     }
 
-    public String getStatus() { 
-        return status; 
+    public String getStatus() {
+        return status;
     }
 
-    public void setStatus(String status) { 
-        this.status = status; 
+    public void setStatus(String status) {
+        this.status = status;
     }
 
-    public Date getTglPinjam() { 
-        return tglPinjam; 
+    public Date getTglPinjam() {
+        return tglPinjam;
     }
 
-    public void setTglPinjam(Date tglPinjam) { 
-        this.tglPinjam = tglPinjam; 
+    public void setTglPinjam(Date tglPinjam) {
+        this.tglPinjam = tglPinjam;
     }
 
     @Override
     public String toString() {
-        return "Pesanan{" + "idSewa=" + idSewa + ", penyewa=" + namaPenyewa + ", total=" + totalBiaya + '}';
+        return "Pesanan{" +
+                "idSewa='" + idSewa + '\'' +
+                ", namaPenyewa='" + namaPenyewa + '\'' +
+                ", namaKostum='" + namaKostum + '\'' +
+                ", jumlah=" + jumlah +
+                ", totalBiaya=" + totalBiaya +
+                ", status='" + status + '\'' +
+                '}';
     }
 }
