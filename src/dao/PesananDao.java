@@ -4,37 +4,29 @@ import java.util.List;
 import model.Pesanan;
 
 public interface PesananDao {
-    /**
-     * Menyimpan transaksi baru, mengurangi stok kostum, 
-     * dan mengubah status kostum menjadi 'Disewa' jika stok habis.
-     */
-    boolean insert(Pesanan p) throws Exception; 
-    
-    /**
-     * Mengambil daftar pesanan menggunakan LEFT JOIN agar data tetap muncul 
-     * meskipun status kostum berubah.
-     */
+    // Method Standar CRUD Pesanan
     List<Pesanan> findAll(String keyword) throws Exception;
-    
-    /**
-     * Menghapus transaksi dan mengembalikan stok kostum secara otomatis.
-     */
-    boolean delete(String id) throws Exception;
-    
-    /**
-     * Memperbarui data transaksi dan mengembalikan stok/status kostum 
-     * jika status transaksi berubah menjadi 'Selesai' atau 'Dibatalkan'.
-     */
+    boolean insert(Pesanan p) throws Exception;
     boolean update(Pesanan p) throws Exception;
-    
-    /**
-     * Mengambil ID Kostum berdasarkan ID Sewa. 
-     * Sangat penting untuk mencegah ID Kostum menjadi NULL saat proses update.
-     */
-    String getIdKostumByIdSewa(String idSewa) throws Exception;
-    
-    /**
-     * Mencari detail pesanan berdasarkan ID.
-     */
+    boolean delete(String id) throws Exception;
     Pesanan findById(String id) throws Exception;
+    
+    // Method Helper untuk Relasi Data
+    String getIdKostumByIdSewa(String idSewa) throws Exception;
+
+    // =======================================================
+    // TAMBAHAN UNTUK MENDUKUNG PANEL ADD PESANAN (FIX FINAL)
+    // =======================================================
+    
+    /** Mengambil daftar ID - Nama Kostum yang stoknya > 0 */
+    List<String> getAvailableCostumes() throws Exception;
+
+    /** Mengambil semua nama pelanggan untuk JComboBox */
+    List<String> getPelangganNames() throws Exception;
+
+    /** Mengambil harga sewa per unit berdasarkan ID Kostum */
+    double getCostumePrice(String idKostum) throws Exception;
+
+    /** Mengambil sisa stok berdasarkan ID Kostum */
+    int getCostumeStock(String idKostum) throws Exception;
 }

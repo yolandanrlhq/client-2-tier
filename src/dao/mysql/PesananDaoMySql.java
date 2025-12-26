@@ -10,33 +10,29 @@ import java.util.List;
 
 public class PesananDaoMySql implements PesananDao {
 
-    // =========================
-    // INSERT PESANAN (AMAN)
-    // =========================
+    // ==========================================
+    // METHOD STANDAR CRUD (SUDAH ADA)
+    // ==========================================
+
     @Override
     public boolean insert(Pesanan p) throws Exception {
         Connection conn = DBConfig.getConnection();
         conn.setAutoCommit(false);
-
         try {
             // 1. Ambil nama kostum (snapshot)
             String namaKostum = null;
-            PreparedStatement psNama = conn.prepareStatement(
-                "SELECT nama_kostum FROM kostum WHERE id_kostum=?"
-            );
+            PreparedStatement psNama = conn.prepareStatement("SELECT nama_kostum FROM kostum WHERE id_kostum=?");
             psNama.setString(1, p.getIdKostum());
             ResultSet rsNama = psNama.executeQuery();
-
             if (rsNama.next()) {
                 namaKostum = rsNama.getString("nama_kostum");
             } else {
                 throw new Exception("Kostum tidak ditemukan");
             }
 
-            // 2. Insert pesanan (WAJIB id_kostum & nama_kostum)
+            // 2. Insert pesanan
             PreparedStatement pst = conn.prepareStatement(
-                "INSERT INTO pesanan " +
-                "(id_sewa, nama_penyewa, id_kostum, nama_kostum, jumlah, tgl_pinjam, total_biaya, status) " +
+                "INSERT INTO pesanan (id_sewa, nama_penyewa, id_kostum, nama_kostum, jumlah, tgl_pinjam, total_biaya, status) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
             );
             pst.setString(1, p.getIdSewa());
@@ -50,21 +46,18 @@ public class PesananDaoMySql implements PesananDao {
             pst.executeUpdate();
 
             // 3. Kurangi stok
-            PreparedStatement pstStok = conn.prepareStatement(
-                "UPDATE kostum SET stok = stok - ? WHERE id_kostum=?"
-            );
+            PreparedStatement pstStok = conn.prepareStatement("UPDATE kostum SET stok = stok - ? WHERE id_kostum=?");
             pstStok.setInt(1, p.getJumlah());
             pstStok.setString(2, p.getIdKostum());
             pstStok.executeUpdate();
 
-            // 4. Update status kostum
-            conn.createStatement().executeUpdate(
-                "UPDATE kostum SET status='Disewa' WHERE id_kostum='" + p.getIdKostum() + "' AND stok <= 0"
-            );
+            // 4. Update status kostum jika stok habis
+            PreparedStatement pstStatus = conn.prepareStatement("UPDATE kostum SET status='Disewa' WHERE id_kostum=? AND stok <= 0");
+            pstStatus.setString(1, p.getIdKostum());
+            pstStatus.executeUpdate();
 
             conn.commit();
             return true;
-
         } catch (Exception e) {
             conn.rollback();
             throw e;
@@ -73,118 +66,80 @@ public class PesananDaoMySql implements PesananDao {
         }
     }
 
-    // =========================
-    // FIND ALL (TANPA JOIN ❗)
-    // =========================
     @Override
     public List<Pesanan> findAll(String keyword) throws Exception {
         List<Pesanan> list = new ArrayList<>();
-
-        String sql =
-            "SELECT * FROM pesanan " +
-            "WHERE id_sewa LIKE ? OR nama_penyewa LIKE ? OR nama_kostum LIKE ? " +
-            "ORDER BY tgl_pinjam DESC";
-
-        Connection conn = DBConfig.getConnection();
-        PreparedStatement pst = conn.prepareStatement(sql);
-
-        String key = "%" + keyword + "%";
-        pst.setString(1, key);
-        pst.setString(2, key);
-        pst.setString(3, key);
-
-        ResultSet rs = pst.executeQuery();
-        while (rs.next()) {
-            Pesanan p = new Pesanan();
-            p.setIdSewa(rs.getString("id_sewa"));
-            p.setNamaPenyewa(rs.getString("nama_penyewa"));
-            p.setIdKostum(rs.getString("id_kostum"));
-            p.setNamaKostum(rs.getString("nama_kostum")); // 🔥 AMAN
-            p.setJumlah(rs.getInt("jumlah"));
-            p.setTglPinjam(rs.getDate("tgl_pinjam"));
-            p.setTotalBiaya(rs.getDouble("total_biaya"));
-            p.setStatus(rs.getString("status"));
-            list.add(p);
+        String sql = "SELECT * FROM pesanan WHERE id_sewa LIKE ? OR nama_penyewa LIKE ? OR nama_kostum LIKE ? ORDER BY tgl_pinjam DESC";
+        try (Connection conn = DBConfig.getConnection();
+             PreparedStatement pst = conn.prepareStatement(sql)) {
+            String key = "%" + keyword + "%";
+            pst.setString(1, key);
+            pst.setString(2, key);
+            pst.setString(3, key);
+            ResultSet rs = pst.executeQuery();
+            while (rs.next()) {
+                Pesanan p = new Pesanan();
+                p.setIdSewa(rs.getString("id_sewa"));
+                p.setNamaPenyewa(rs.getString("nama_penyewa"));
+                p.setIdKostum(rs.getString("id_kostum"));
+                p.setNamaKostum(rs.getString("nama_kostum"));
+                p.setJumlah(rs.getInt("jumlah"));
+                p.setTglPinjam(rs.getDate("tgl_pinjam"));
+                p.setTotalBiaya(rs.getDouble("total_biaya"));
+                p.setStatus(rs.getString("status"));
+                list.add(p);
+            }
         }
-
-        conn.close();
         return list;
     }
 
-    // =========================
-    // UPDATE STATUS PESANAN
-    // =========================
     @Override
     public boolean update(Pesanan p) throws Exception {
         Connection conn = DBConfig.getConnection();
         conn.setAutoCommit(false);
-
         try {
-            // 1. Update status pesanan
-            String sqlUpdatePesanan =
-                "UPDATE pesanan SET status=? WHERE id_sewa=?";
-            PreparedStatement pst = conn.prepareStatement(sqlUpdatePesanan);
+            PreparedStatement pst = conn.prepareStatement("UPDATE pesanan SET status=? WHERE id_sewa=?");
             pst.setString(1, p.getStatus());
             pst.setString(2, p.getIdSewa());
             pst.executeUpdate();
 
-            // 2. JIKA SELESAI / DIBATALKAN → KEMBALIKAN STOK
-            if (p.getStatus().equalsIgnoreCase("Selesai")
-                || p.getStatus().equalsIgnoreCase("Dibatalkan")) {
-
-                // ambil id_kostum & jumlah
-                String sqlGet =
-                    "SELECT id_kostum, jumlah FROM pesanan WHERE id_sewa=?";
-                pst = conn.prepareStatement(sqlGet);
-                pst.setString(1, p.getIdSewa());
-                ResultSet rs = pst.executeQuery();
-
+            if (p.getStatus().equalsIgnoreCase("Selesai") || p.getStatus().equalsIgnoreCase("Dibatalkan")) {
+                PreparedStatement psGet = conn.prepareStatement("SELECT id_kostum, jumlah FROM pesanan WHERE id_sewa=?");
+                psGet.setString(1, p.getIdSewa());
+                ResultSet rs = psGet.executeQuery();
                 if (rs.next()) {
-                    String idKostum = rs.getString("id_kostum");
-                    int jumlah = rs.getInt("jumlah");
-
-                    // kembalikan stok
-                    String sqlUpdateStok =
-                        "UPDATE kostum SET stok = stok + ?, status='Tersedia' " +
-                        "WHERE id_kostum=?";
-                    pst = conn.prepareStatement(sqlUpdateStok);
-                    pst.setInt(1, jumlah);
-                    pst.setString(2, idKostum);
-                    pst.executeUpdate();
+                    String idK = rs.getString("id_kostum");
+                    int jml = rs.getInt("jumlah");
+                    PreparedStatement psUpStok = conn.prepareStatement("UPDATE kostum SET stok = stok + ?, status='Tersedia' WHERE id_kostum=?");
+                    psUpStok.setInt(1, jml);
+                    psUpStok.setString(2, idK);
+                    psUpStok.executeUpdate();
                 }
             }
-
             conn.commit();
             return true;
-
         } catch (Exception e) {
             conn.rollback();
             throw e;
         } finally {
-            conn.setAutoCommit(true);
             conn.close();
         }
     }
 
-    // =========================
-    // DELETE PESANAN
-    // =========================
     @Override
     public boolean delete(String id) throws Exception {
         Connection conn = DBConfig.getConnection();
         conn.setAutoCommit(false);
-
         try {
             Pesanan p = findById(id);
+            PreparedStatement psDel = conn.prepareStatement("DELETE FROM pesanan WHERE id_sewa=?");
+            psDel.setString(1, id);
+            psDel.executeUpdate();
 
-            conn.createStatement().executeUpdate(
-                "DELETE FROM pesanan WHERE id_sewa='" + id + "'"
-            );
-
-            conn.createStatement().executeUpdate(
-                "UPDATE kostum SET stok = stok + " + p.getJumlah() +
-                ", status='Tersedia' WHERE id_kostum='" + p.getIdKostum() + "'"
-            );
+            PreparedStatement psRest = conn.prepareStatement("UPDATE kostum SET stok = stok + ?, status='Tersedia' WHERE id_kostum=?");
+            psRest.setInt(1, p.getJumlah());
+            psRest.setString(2, p.getIdKostum());
+            psRest.executeUpdate();
 
             conn.commit();
             return true;
@@ -197,40 +152,87 @@ public class PesananDaoMySql implements PesananDao {
     }
 
     @Override
-    public String getIdKostumByIdSewa(String idSewa) throws Exception {
-        Connection conn = DBConfig.getConnection();
-        ResultSet rs = conn.createStatement().executeQuery(
-            "SELECT id_kostum FROM pesanan WHERE id_sewa='" + idSewa + "'"
-        );
-        if (rs.next()) {
-            String id = rs.getString("id_kostum");
-            conn.close();
-            return id;
+    public Pesanan findById(String id) throws Exception {
+        try (Connection conn = DBConfig.getConnection();
+             PreparedStatement ps = conn.prepareStatement("SELECT * FROM pesanan WHERE id_sewa=?")) {
+            ps.setString(1, id);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                Pesanan p = new Pesanan();
+                p.setIdSewa(rs.getString("id_sewa"));
+                p.setNamaPenyewa(rs.getString("nama_penyewa"));
+                p.setIdKostum(rs.getString("id_kostum"));
+                p.setNamaKostum(rs.getString("nama_kostum"));
+                p.setJumlah(rs.getInt("jumlah"));
+                p.setTglPinjam(rs.getDate("tgl_pinjam"));
+                p.setTotalBiaya(rs.getDouble("total_biaya"));
+                p.setStatus(rs.getString("status"));
+                return p;
+            }
         }
-        conn.close();
-        throw new Exception("ID Kostum tidak ditemukan");
+        throw new Exception("Pesanan tidak ditemukan");
     }
 
     @Override
-    public Pesanan findById(String id) throws Exception {
-        Connection conn = DBConfig.getConnection();
-        ResultSet rs = conn.createStatement().executeQuery(
-            "SELECT * FROM pesanan WHERE id_sewa='" + id + "'"
-        );
-        if (rs.next()) {
-            Pesanan p = new Pesanan();
-            p.setIdSewa(rs.getString("id_sewa"));
-            p.setNamaPenyewa(rs.getString("nama_penyewa"));
-            p.setIdKostum(rs.getString("id_kostum"));
-            p.setNamaKostum(rs.getString("nama_kostum"));
-            p.setJumlah(rs.getInt("jumlah"));
-            p.setTglPinjam(rs.getDate("tgl_pinjam"));
-            p.setTotalBiaya(rs.getDouble("total_biaya"));
-            p.setStatus(rs.getString("status"));
-            conn.close();
-            return p;
+    public String getIdKostumByIdSewa(String idSewa) throws Exception {
+        try (Connection conn = DBConfig.getConnection();
+             PreparedStatement ps = conn.prepareStatement("SELECT id_kostum FROM pesanan WHERE id_sewa=?")) {
+            ps.setString(1, idSewa);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) return rs.getString("id_kostum");
         }
-        conn.close();
-        throw new Exception("Pesanan tidak ditemukan");
+        throw new Exception("ID Kostum tidak ditemukan");
+    }
+
+    // ==========================================
+    // METHOD BARU UNTUK INPUT PESANAN (FIX FINAL)
+    // ==========================================
+
+    @Override
+    public List<String> getAvailableCostumes() throws Exception {
+        List<String> list = new ArrayList<>();
+        try (Connection conn = DBConfig.getConnection();
+             Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT id_kostum, nama_kostum FROM kostum WHERE stok > 0")) {
+            while (rs.next()) {
+                list.add(rs.getString("id_kostum") + " - " + rs.getString("nama_kostum"));
+            }
+        }
+        return list;
+    }
+
+    @Override
+    public List<String> getPelangganNames() throws Exception {
+        List<String> list = new ArrayList<>();
+        try (Connection conn = DBConfig.getConnection();
+             Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT nama_pelanggan FROM pelanggan ORDER BY nama_pelanggan ASC")) {
+            while (rs.next()) {
+                list.add(rs.getString("nama_pelanggan"));
+            }
+        }
+        return list;
+    }
+
+    @Override
+    public double getCostumePrice(String idKostum) throws Exception {
+        try (Connection conn = DBConfig.getConnection();
+             PreparedStatement ps = conn.prepareStatement("SELECT harga_sewa FROM kostum WHERE id_kostum=?")) {
+            ps.setString(1, idKostum);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) return rs.getDouble("harga_sewa");
+        }
+        return 0;
+    }
+
+    @Override
+    public int getCostumeStock(String idKostum) throws Exception {
+        try (Connection conn = DBConfig.getConnection();
+             PreparedStatement ps = conn.prepareStatement("SELECT stok FROM kostum WHERE id_kostum=?")) {
+            ps.setString(1, idKostum);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) return rs.getInt("stok");
+        }
+        return 0;
     }
 }

@@ -2,11 +2,10 @@ package view.konten;
 
 import java.awt.*;
 import java.awt.event.*;
-import java.sql.*;
+import java.util.List;
 import javax.swing.*;
 import net.miginfocom.swing.MigLayout;
 import view.FrameUtama;
-import config.DBConfig;
 import model.Pesanan;
 import controller.PesananController;
 
@@ -17,23 +16,26 @@ public class PanelAddPesanan extends JPanel {
     private JSpinner txtJumlah;
     private JButton btnSimpan;
     private double hargaPerUnit = 0;
+    private int stokTersedia = 0;
 
+    // Gunakan controller untuk semua urusan data
     private PesananController controller = new PesananController(null);
     private FrameUtama frameUtama;
-
     private MigLayout mainLayout;
     private JLabel lblTitle;
 
     public PanelAddPesanan(FrameUtama frame) {
         this.frameUtama = frame;
+        initializeUI();
+        loadInitialData();
+    }
 
+    private void initializeUI() {
         mainLayout = new MigLayout("fillx, insets 40", "[right]20[grow, fill]");
         setLayout(mainLayout);
         setBackground(Color.WHITE);
 
         setupStaticComponents();
-        loadKostumCombo();
-        loadPelangganCombo();
 
         addComponentListener(new ComponentAdapter() {
             @Override
@@ -49,10 +51,14 @@ public class PanelAddPesanan extends JPanel {
 
         txtIDSewa = new JTextField();
         cbPenyewa = new JComboBox<>();
+        
         cbKostum = new JComboBox<>();
-        cbKostum.addActionListener(e -> ambilHargaKostum());
+        cbKostum.addActionListener(e -> updateInfoKostum());
 
-        txtJumlah = new JSpinner(new SpinnerNumberModel(1, 1, 100, 1));
+        // Spinner awal dengan batas 1 (akan diupdate saat pilih kostum)
+        txtJumlah = new JSpinner(new SpinnerNumberModel(1, 1, 1, 1));
+        // Matikan input keyboard agar user tidak bisa mengetik angka melebihi stok
+        ((JSpinner.DefaultEditor) txtJumlah.getEditor()).getTextField().setEditable(false);
         txtJumlah.addChangeListener(e -> hitungTotal());
 
         txtTotal = new JTextField();
@@ -68,12 +74,50 @@ public class PanelAddPesanan extends JPanel {
         btnSimpan.addActionListener(e -> simpanPesananAsync());
     }
 
+    public void loadInitialData() {
+        // Load Pelanggan via Controller
+        cbPenyewa.removeAllItems();
+        cbPenyewa.addItem("-- Pilih Pelanggan --");
+        controller.ambilDaftarPelanggan().forEach(cbPenyewa::addItem);
+
+        // Load Kostum via Controller
+        cbKostum.removeAllItems();
+        cbKostum.addItem("-- Pilih Kostum --");
+        controller.ambilDaftarKostumTersedia().forEach(cbKostum::addItem);
+    }
+
+    private void updateInfoKostum() {
+        if (cbKostum.getSelectedIndex() <= 0) {
+            hargaPerUnit = 0;
+            stokTersedia = 0;
+            txtJumlah.setModel(new SpinnerNumberModel(1, 1, 1, 1));
+            hitungTotal();
+            return;
+        }
+
+        String selectedItem = cbKostum.getSelectedItem().toString();
+        String idKostum = selectedItem.split(" - ")[0];
+
+        // Minta detail harga dan stok ke controller
+        hargaPerUnit = controller.getHargaKostum(idKostum);
+        stokTersedia = controller.getStokKostum(idKostum);
+
+        // Update Model Spinner agar MAKSIMAL sesuai stok
+        int currentVal = (int) txtJumlah.getValue();
+        if (currentVal > stokTersedia) currentVal = stokTersedia;
+        if (stokTersedia < 1) currentVal = 0; // Jaga-jaga jika stok habis mendadak
+
+        txtJumlah.setModel(new SpinnerNumberModel(Math.max(1, currentVal), 1, Math.max(1, stokTersedia), 1));
+        hitungTotal();
+    }
+
+    private void hitungTotal() {
+        int j = (int) txtJumlah.getValue();
+        txtTotal.setText(String.format("%.0f", hargaPerUnit * j));
+    }
+
     private void simpanPesananAsync() {
-
-        if (cbKostum.getSelectedIndex() <= 0 ||
-            cbPenyewa.getSelectedIndex() <= 0 ||
-            txtIDSewa.getText().trim().isEmpty()) {
-
+        if (cbKostum.getSelectedIndex() <= 0 || cbPenyewa.getSelectedIndex() <= 0 || txtIDSewa.getText().trim().isEmpty()) {
             JOptionPane.showMessageDialog(this, "Mohon lengkapi data!");
             return;
         }
@@ -82,161 +126,79 @@ public class PanelAddPesanan extends JPanel {
         p.setIdSewa(txtIDSewa.getText().trim());
         p.setNamaPenyewa(cbPenyewa.getSelectedItem().toString());
 
-        String[] kostum = cbKostum.getSelectedItem().toString().split(" - ");
-        p.setIdKostum(kostum[0]);
-        p.setNamaKostum(kostum[1]);
-
+        String[] kostumPart = cbKostum.getSelectedItem().toString().split(" - ");
+        p.setIdKostum(kostumPart[0]);
+        p.setNamaKostum(kostumPart[1]);
         p.setJumlah((int) txtJumlah.getValue());
         p.setTglPinjam(new java.util.Date());
         p.setTotalBiaya(Double.parseDouble(txtTotal.getText()));
         p.setStatus("Disewa");
 
-        JProgressBar progressBar = new JProgressBar(0, 100);
-        progressBar.setStringPainted(true);
-
-        JLabel lblInfo = new JLabel("Menyiapkan transaksi...");
-        JDialog loadingDialog = createProgressDialog(progressBar, lblInfo);
+        // UI Feedback (Loading Dialog)
+        JProgressBar pb = new JProgressBar(0, 100);
+        pb.setStringPainted(true);
+        JLabel lblInfo = new JLabel("Menyimpan transaksi...");
+        JDialog loading = createProgressDialog(pb, lblInfo);
 
         btnSimpan.setEnabled(false);
-        loadingDialog.setVisible(true);
-
-        SwingWorker<Boolean, Integer> worker = new SwingWorker<>() {
-
+        
+        new SwingWorker<Boolean, Integer>() {
             @Override
             protected Boolean doInBackground() throws Exception {
-                publish(10);
-                Thread.sleep(500);
-
-                publish(40);
-                Thread.sleep(500);
-
-                boolean result = controller.getService().simpanPesanan(p);
-
-                publish(80);
-                Thread.sleep(500);
-
-                return result;
+                publish(20); Thread.sleep(300);
+                publish(50);
+                boolean success = controller.getService().simpanPesanan(p);
+                publish(90); Thread.sleep(200);
+                return success;
             }
 
             @Override
-            protected void process(java.util.List<Integer> chunks) {
+            protected void process(List<Integer> chunks) {
                 int val = chunks.get(chunks.size() - 1);
-                progressBar.setValue(val);
+                pb.setValue(val);
                 lblInfo.setText("Proses " + val + "%");
             }
 
             @Override
             protected void done() {
+                loading.dispose();
+                btnSimpan.setEnabled(true);
                 try {
-                    progressBar.setValue(100);
-                    lblInfo.setText("Selesai 100%");
-                    Thread.sleep(400);
-
                     if (get()) {
-                        JOptionPane.showMessageDialog(PanelAddPesanan.this,
-                                "Transaksi berhasil disimpan!");
+                        JOptionPane.showMessageDialog(PanelAddPesanan.this, "Transaksi Berhasil!");
                         resetForm();
-                        if (frameUtama != null) {
-                            frameUtama.gantiPanel("pesanan");
-                        }
+                        if (frameUtama != null) frameUtama.gantiPanel("pesanan");
                     } else {
-                        JOptionPane.showMessageDialog(PanelAddPesanan.this,
-                                "Gagal menyimpan transaksi.");
+                        JOptionPane.showMessageDialog(PanelAddPesanan.this, "Gagal simpan (Cek stok/ID)");
                     }
                 } catch (Exception e) {
-                    e.printStackTrace();
-                    JOptionPane.showMessageDialog(PanelAddPesanan.this,
-                            "Terjadi kesalahan saat menyimpan data.");
-                } finally {
-                    btnSimpan.setEnabled(true);
-                    loadingDialog.dispose();
+                    JOptionPane.showMessageDialog(PanelAddPesanan.this, "Error: " + e.getMessage());
                 }
             }
-        };
-
-        worker.execute();
-    }
-
-    public void loadPelangganCombo() {
-        cbPenyewa.removeAllItems();
-        cbPenyewa.addItem("-- Pilih Pelanggan --");
-        try (Connection c = DBConfig.getConnection();
-             Statement s = c.createStatement();
-             ResultSet r = s.executeQuery("SELECT nama_pelanggan FROM pelanggan")) {
-
-            while (r.next()) cbPenyewa.addItem(r.getString("nama_pelanggan"));
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public void loadKostumCombo() {
-        cbKostum.removeAllItems();
-        cbKostum.addItem("-- Pilih Kostum --");
-        try (Connection c = DBConfig.getConnection();
-             Statement s = c.createStatement();
-             ResultSet r = s.executeQuery(
-                     "SELECT id_kostum,nama_kostum FROM kostum WHERE stok>0")) {
-
-            while (r.next()) {
-                cbKostum.addItem(r.getString(1) + " - " + r.getString(2));
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void ambilHargaKostum() {
-        if (cbKostum.getSelectedIndex() <= 0) {
-            hargaPerUnit = 0;
-            hitungTotal();
-            return;
-        }
-
-        String id = cbKostum.getSelectedItem().toString().split(" - ")[0];
-        try (Connection c = DBConfig.getConnection();
-             PreparedStatement p =
-                     c.prepareStatement("SELECT harga_sewa FROM kostum WHERE id_kostum=?")) {
-
-            p.setString(1, id);
-            ResultSet r = p.executeQuery();
-            if (r.next()) hargaPerUnit = r.getDouble(1);
-            hitungTotal();
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void hitungTotal() {
-        int j = (int) txtJumlah.getValue();
-        txtTotal.setText(String.valueOf((int) (hargaPerUnit * j)));
+        }.execute();
+        
+        loading.setVisible(true);
     }
 
     private void resetForm() {
         txtIDSewa.setText("");
         cbPenyewa.setSelectedIndex(0);
         cbKostum.setSelectedIndex(0);
-        txtJumlah.setValue(1);
+        txtJumlah.setModel(new SpinnerNumberModel(1, 1, 1, 1));
         txtTotal.setText("");
         hargaPerUnit = 0;
     }
 
     private JDialog createProgressDialog(JProgressBar bar, JLabel label) {
-        JDialog d = new JDialog(
-                SwingUtilities.getWindowAncestor(this),
-                "Proses Penyimpanan",
-                Dialog.ModalityType.MODELESS
-        );
-        d.setResizable(true);
-        d.setLayout(new BorderLayout(10, 10));
-
-        JPanel p = new JPanel(new BorderLayout(10, 10));
-        p.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
-        p.add(label, BorderLayout.NORTH);
-        p.add(bar, BorderLayout.CENTER);
-
+        JDialog d = new JDialog(SwingUtilities.getWindowAncestor(this), "Proses", Dialog.ModalityType.APPLICATION_MODAL);
+        d.setUndecorated(true);
+        JPanel p = new JPanel(new MigLayout("fill, insets 20"));
+        p.setBackground(Color.WHITE);
+        p.setBorder(BorderFactory.createLineBorder(new Color(200, 200, 200)));
+        p.add(label, "wrap 10, center");
+        p.add(bar, "growx, w 250!");
         d.add(p);
-        d.setSize(350, 150);
+        d.pack();
         d.setLocationRelativeTo(this);
         return d;
     }
@@ -244,29 +206,22 @@ public class PanelAddPesanan extends JPanel {
     private void refreshLayout() {
         Window w = SwingUtilities.getWindowAncestor(this);
         if (w == null) return;
-
         removeAll();
-        if (w.getWidth() <= 768) {
-            mainLayout.setLayoutConstraints("fillx, insets 20");
-            add(lblTitle, "span 2, center, wrap 30");
-            add(new JLabel("ID Sewa")); add(txtIDSewa, "wrap");
-            add(new JLabel("Penyewa")); add(cbPenyewa, "wrap");
-            add(new JLabel("Kostum")); add(cbKostum, "wrap");
-            add(new JLabel("Jumlah")); add(txtJumlah, "wrap");
-            add(new JLabel("Total")); add(txtTotal, "wrap 30");
-            add(btnSimpan, "span 2, growx, h 45!");
-        } else {
-            mainLayout.setLayoutConstraints("fillx, insets 80 50");
-            add(lblTitle, "span 2, center, wrap 40");
-            add(new JLabel("ID Sewa")); add(txtIDSewa, "wrap");
-            add(new JLabel("Nama Pelanggan")); add(cbPenyewa, "wrap");
-            add(new JLabel("Pilih Kostum")); add(cbKostum, "wrap");
-            add(new JLabel("Jumlah Unit")); add(txtJumlah, "wrap");
-            add(new JLabel("Total Biaya")); add(txtTotal, "wrap 30");
-            add(btnSimpan, "span 2, center, w 250!, h 50!");
-        }
+        boolean isMobile = w.getWidth() <= 768;
+        
+        String constraints = isMobile ? "fillx, insets 20" : "fillx, insets 60 100";
+        mainLayout.setLayoutConstraints(constraints);
 
-        revalidate();
-        repaint();
+        add(lblTitle, "span 2, center, wrap 30");
+        add(new JLabel("ID Sewa")); add(txtIDSewa, "wrap");
+        add(new JLabel("Pelanggan")); add(cbPenyewa, "wrap");
+        add(new JLabel("Kostum")); add(cbKostum, "wrap");
+        add(new JLabel("Jumlah (Max: " + stokTersedia + ")")); add(txtJumlah, "wrap");
+        add(new JLabel("Total Harga")); add(txtTotal, "wrap 30");
+        
+        String btnSize = isMobile ? "span 2, growx, h 45!" : "span 2, center, w 250!, h 50!";
+        add(btnSimpan, btnSize);
+
+        revalidate(); repaint();
     }
 }

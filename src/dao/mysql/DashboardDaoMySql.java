@@ -1,42 +1,52 @@
 package dao.mysql;
 
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 import config.DBConfig;
 import dao.DashboardDao;
-import model.DashboardModel; // Import model baru kamu
+import model.DashboardModel;
 
 public class DashboardDaoMySql implements DashboardDao {
+    
     @Override
     public DashboardModel getStatistics() {
-        // Inisialisasi variabel dengan nilai default
-        int totalKostum = 0;
-        int sedangDisewa = 0;
-        double totalPendapatan = 0.0;
-
-        String sql1 = "SELECT COUNT(*) FROM kostum";
-        String sql2 = "SELECT COUNT(*) FROM pesanan WHERE status = 'Disewa'";
-        String sql3 = "SELECT SUM(total_biaya) FROM pesanan";
+        // Menggunakan teknik Subquery agar hanya 1x jalan ke database (Efisiensi Tinggi)
+        String sql = "SELECT " +
+                     "(SELECT COUNT(*) FROM kostum) as tk, " +
+                     "(SELECT COUNT(*) FROM pesanan WHERE status = 'Disewa') as sd, " +
+                     "(SELECT SUM(total_biaya) FROM pesanan) as tp";
 
         try (Connection conn = DBConfig.getConnection();
-             Statement st = conn.createStatement()) {
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
             
-            // Eksekusi Query 1
-            ResultSet rs1 = st.executeQuery(sql1);
-            if (rs1.next()) totalKostum = rs1.getInt(1);
-
-            // Eksekusi Query 2
-            ResultSet rs2 = st.executeQuery(sql2);
-            if (rs2.next()) sedangDisewa = rs2.getInt(1);
-
-            // Eksekusi Query 3
-            ResultSet rs3 = st.executeQuery(sql3);
-            if (rs3.next()) totalPendapatan = rs3.getDouble(1);
-            
+            if (rs.next()) {
+                return new DashboardModel(
+                    rs.getInt("tk"), 
+                    rs.getInt("sd"), 
+                    rs.getDouble("tp")
+                );
+            }
         } catch (SQLException e) {
             e.printStackTrace();
         }
+        return new DashboardModel(0, 0, 0.0);
+    }
 
-        // Kembalikan dalam bentuk Objek Model (Inilah inti 2-Tier yang rapi)
-        return new DashboardModel(totalKostum, sedangDisewa, totalPendapatan);
+    // Melengkapi method yang tadi kamu buat draftnya
+    public List<String> getAvailableCostumes() throws Exception {
+        List<String> list = new ArrayList<>();
+        String sql = "SELECT id_kostum, nama_kostum FROM kostum WHERE stok > 0";
+        
+        try (Connection conn = DBConfig.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            
+            while (rs.next()) {
+                list.add(rs.getString("id_kostum") + " - " + rs.getString("nama_kostum"));
+            }
+        }
+        return list;
     }
 }

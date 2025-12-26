@@ -218,8 +218,8 @@ public class FrameUtama extends JFrame {
         switch (key) {
             case "dashboard" -> pDashboard.refreshData();
             case "produk" -> pProduk.refresh();
-            case "pesanan" -> pPesanan.loadData("");
-            case "add_pesanan" -> pAddPesanan.loadKostumCombo();
+            case "pesanan" -> pPesanan.loadDataSilent("");
+            case "add_pesanan" -> pAddPesanan.loadInitialData();
             case "pelanggan" -> pPelanggan.loadData();
         }
     }
