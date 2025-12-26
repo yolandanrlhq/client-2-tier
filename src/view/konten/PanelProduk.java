@@ -199,32 +199,47 @@ public class PanelProduk extends JPanel {
     // RESPONSIVE
     // =========================
     private void applyResponsiveTable() {
-        Window w = SwingUtilities.getWindowAncestor(this);
-        if (w == null) return;
+    Window w = SwingUtilities.getWindowAncestor(this);
+    if (w == null) return;
 
-        int width = w.getWidth();
-        TableColumnModel tcm = table.getColumnModel();
+    int width = w.getWidth();
+    TableColumnModel tcm = table.getColumnModel();
 
-        if (width <= 768) {
-            hideColumn(tcm, 4);
-            hideColumn(tcm, 5);
-            hideColumn(tcm, 6);
-        } else if (width <= 1200) {
-            showColumn(tcm, 4, 70);
-            hideColumn(tcm, 5);
-            showColumn(tcm, 6, 90);
-        } else {
-            showColumn(tcm, 4, 70);
-            showColumn(tcm, 5, 120);
-            showColumn(tcm, 6, 100);
-        }
+    if (width <= 768) {
+        // Mobile: semua tetap tampil, tapi diperkecil
+        showColumn(tcm, 0, 70);   // ID
+        showColumn(tcm, 1, 120);  // Nama
+        showColumn(tcm, 2, 90);   // Kategori
+        showColumn(tcm, 3, 60);   // Stok
+        showColumn(tcm, 4, 60);   // Ukuran
+        showColumn(tcm, 5, 90);   // Harga
+        showColumn(tcm, 6, 70);   // Aksi
     }
-
-    private void hideColumn(TableColumnModel tcm, int index) {
-        tcm.getColumn(index).setMinWidth(0);
-        tcm.getColumn(index).setMaxWidth(0);
-        tcm.getColumn(index).setPreferredWidth(0);
+    else if (width <= 1200) {
+        // Tablet
+        showColumn(tcm, 0, 80);
+        showColumn(tcm, 1, 160);
+        showColumn(tcm, 2, 100);
+        showColumn(tcm, 3, 70);
+        showColumn(tcm, 4, 70);
+        showColumn(tcm, 5, 110);
+        showColumn(tcm, 6, 90);
     }
+    else {
+        // Desktop
+        showColumn(tcm, 0, 100);
+        showColumn(tcm, 1, 220);
+        showColumn(tcm, 2, 120);
+        showColumn(tcm, 3, 80);
+        showColumn(tcm, 4, 80);
+        showColumn(tcm, 5, 140);
+        showColumn(tcm, 6, 100);
+    }
+}
+
+
+
+  
 
     private void showColumn(TableColumnModel tcm, int index, int width) {
         tcm.getColumn(index).setMinWidth(50);
