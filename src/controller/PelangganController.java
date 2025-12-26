@@ -1,10 +1,10 @@
 package controller;
 
-import service.PelangganService;
-import view.konten.PanelPelanggan;
-import model.Pelanggan;
 import java.util.List;
 import javax.swing.SwingUtilities;
+import model.Pelanggan;
+import service.PelangganService;
+import view.konten.PanelPelanggan;
 
 public class PelangganController {
     private PanelPelanggan view;
@@ -20,7 +20,6 @@ public class PelangganController {
         if (view != null) {
             view.getModel().setRowCount(0);
             for (Pelanggan p : list) {
-                // p.getId() sekarang mengembalikan "HD001"
                 view.getModel().addRow(new Object[]{p.getId(), p.getNama(), p.getNoWa(), p.getAlamat(), "Aksi"});
             }
         }
@@ -33,7 +32,17 @@ public class PelangganController {
         }).start();
     }
 
-    public void deleteData(String id) { // Ubah parameter jadi String
+    public void updateData(Pelanggan p, Runnable callback) {
+        new Thread(() -> {
+            service.save(p);
+            SwingUtilities.invokeLater(() -> {
+                displayData();
+                if (callback != null) callback.run();
+            });
+        }).start();
+    }
+
+    public void deleteData(String id) {
         service.remove(id);
         displayData();
     }

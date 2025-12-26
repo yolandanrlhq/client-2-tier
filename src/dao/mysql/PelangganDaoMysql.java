@@ -27,13 +27,23 @@ public class PelangganDaoMysql implements PelangganDao {
 
     @Override
     public void save(Pelanggan p) {
-        String sql = "INSERT INTO pelanggan (id_pelanggan, nama_pelanggan, no_wa, alamat) VALUES (?, ?, ?, ?)";
+        // Query ini otomatis UPDATE jika ID sudah ada di database
+        String sql = "INSERT INTO pelanggan (id_pelanggan, nama_pelanggan, no_wa, alamat) VALUES (?, ?, ?, ?) " +
+                     "ON DUPLICATE KEY UPDATE nama_pelanggan=?, no_wa=?, alamat=?";
         try (Connection conn = DBConfig.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, generateID());
+            
+            String finalID = (p.getId() == null || p.getId().isEmpty()) ? generateID() : p.getId();
+            
+            ps.setString(1, finalID);
             ps.setString(2, p.getNama());
             ps.setString(3, p.getNoWa());
             ps.setString(4, p.getAlamat());
+            // Parameter untuk Update
+            ps.setString(5, p.getNama());
+            ps.setString(6, p.getNoWa());
+            ps.setString(7, p.getAlamat());
+            
             ps.executeUpdate();
         } catch (SQLException e) { e.printStackTrace(); }
     }
@@ -58,7 +68,7 @@ public class PelangganDaoMysql implements PelangganDao {
     }
 
     @Override
-    public void delete(String id) { // PASTIKAN String
+    public void delete(String id) {
         String sql = "DELETE FROM pelanggan WHERE id_pelanggan = ?";
         try (Connection conn = DBConfig.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
