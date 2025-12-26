@@ -1,12 +1,15 @@
 package view.konten;
 
+import controller.ProdukController;
+import model.Kostum;
+import worker.ProdukLoadWorker;
+
 import java.awt.*;
 import java.awt.event.*;
-import java.sql.*;
+import java.util.List;
 import javax.swing.*;
 import javax.swing.table.*;
 import net.miginfocom.swing.MigLayout;
-import config.DBConfig;
 
 public class PanelProduk extends JPanel {
 
@@ -15,9 +18,11 @@ public class PanelProduk extends JPanel {
     private JTextField txtSearch;
     private MigLayout mainLayout;
 
+    private final ProdukController controller = new ProdukController();
+
     public PanelProduk() {
         initializeUI();
-        loadData();
+        refresh(); // load awal TANPA delay
 
         addComponentListener(new ComponentAdapter() {
             @Override
@@ -27,8 +32,11 @@ public class PanelProduk extends JPanel {
         });
     }
 
+    // =========================
+    // UI
+    // =========================
     private void initializeUI() {
-        mainLayout = new MigLayout("fill, insets 30", "[grow]", "[]20[grow]");
+        mainLayout = new MigLayout("fill, insets 30", "[grow]", "[]20[]20[grow]");
         setLayout(mainLayout);
         setBackground(Color.WHITE);
 
@@ -45,7 +53,7 @@ public class PanelProduk extends JPanel {
                 "JTextField.placeholderText",
                 "Cari ID / Nama / Kategori..."
         );
-        txtSearch.addActionListener(e -> search());
+        txtSearch.addActionListener(e -> search()); // ENTER
 
         JButton btnSearch = new JButton("Search");
         btnSearch.addActionListener(e -> search());
@@ -53,7 +61,7 @@ public class PanelProduk extends JPanel {
         JButton btnRefresh = new JButton("Refresh Data");
         btnRefresh.addActionListener(e -> {
             txtSearch.setText("");
-            loadData();
+            refresh();
         });
 
         toolbar.add(txtSearch, "grow");
@@ -64,98 +72,131 @@ public class PanelProduk extends JPanel {
 
         // ===== TABLE =====
         String[] columns = {
-            "ID", "Nama Kostum", "Kategori", "Stok",
-            "Ukuran", "Harga Sewa", "Status", "Aksi"
+                "ID", "Nama Kostum", "Kategori", "Stok",
+                "Ukuran", "Harga Sewa", "Aksi"
         };
 
         model = new DefaultTableModel(null, columns) {
             @Override
             public boolean isCellEditable(int row, int column) {
-                return column == 7;
+                return column == 6; // kolom AKSI
             }
         };
 
         table = new JTable(model);
         table.setRowHeight(40);
+
         table.getTableHeader().setFont(new Font("Inter", Font.BOLD, 12));
         table.getTableHeader().setBackground(new Color(245, 245, 245));
         table.getTableHeader().setForeground(new Color(60, 60, 60));
 
-        // ===== GARIS TABEL =====
         table.setShowGrid(true);
         table.setGridColor(new Color(220, 220, 220));
 
-        // ===== SORTING =====
-        TableRowSorter<DefaultTableModel> sorter =
-                new TableRowSorter<>(model);
-        table.setRowSorter(sorter);
-
-        // ===== ZEBRA ROW RENDERER =====
+        table.setRowSorter(new TableRowSorter<>(model));
         table.setDefaultRenderer(Object.class, new ZebraRenderer());
 
-        // ===== AKSI =====
         table.getColumn("Aksi").setCellRenderer(new ActionRenderer());
         table.getColumn("Aksi").setCellEditor(new ActionEditor());
         table.getColumn("Aksi").setMaxWidth(90);
 
         JScrollPane sp = new JScrollPane(table);
         sp.setBorder(BorderFactory.createLineBorder(new Color(220, 220, 220)));
+
         add(sp, "grow");
+    }
+
+    // =========================
+    // API PUBLIK
+    // =========================
+    public void refresh() {
+        loadAsync("");
+    }
+
+    private void search() {
+        String keyword = txtSearch.getText().trim();
+
+        JDialog loading = createLoadingDialog();
+        loading.setVisible(true);
+
+        new SwingWorker<Void, Void>() {
+            @Override
+            protected Void doInBackground() throws Exception {
+                Thread.sleep(2000); // delay UX
+                return null;
+            }
+
+            @Override
+            protected void done() {
+                loading.dispose();
+                loadAsync(keyword);
+            }
+        }.execute();
+    }
+
+    // =========================
+    // LOADING DIALOG
+    // =========================
+    private JDialog createLoadingDialog() {
+        JProgressBar bar = new JProgressBar();
+        bar.setIndeterminate(true);
+
+        JLabel lbl = new JLabel("Memuat data produk...");
+        lbl.setFont(new Font("Inter", Font.PLAIN, 14));
+
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20));
+        panel.add(lbl, BorderLayout.NORTH);
+        panel.add(bar, BorderLayout.CENTER);
+
+        JDialog dialog = new JDialog(
+                SwingUtilities.getWindowAncestor(this),
+                "Loading",
+                Dialog.ModalityType.MODELESS
+        );
+        dialog.setContentPane(panel);
+        dialog.setSize(360, 120);
+        dialog.setLocationRelativeTo(this);
+        dialog.setResizable(false);
+
+        return dialog;
     }
 
     // =========================
     // LOAD DATA
     // =========================
-    public void loadData() {
-        loadData("");
-    }
-
-    public void loadData(String keyword) {
+    private void loadAsync(String keyword) {
         model.setRowCount(0);
 
-        try {
-            Connection conn = DBConfig.getConnection();
+        ProdukLoadWorker worker = controller.loadAsync(keyword);
+        worker.execute();
 
-            String sql = """
-                SELECT * FROM kostum
-                WHERE id_kostum LIKE ?
-                   OR nama_kostum LIKE ?
-                   OR kategori LIKE ?
-                ORDER BY nama_kostum ASC
-            """;
-
-            PreparedStatement pst = conn.prepareStatement(sql);
-            String key = "%" + keyword + "%";
-            pst.setString(1, key);
-            pst.setString(2, key);
-            pst.setString(3, key);
-
-            ResultSet res = pst.executeQuery();
-
-            while (res.next()) {
-                model.addRow(new Object[]{
-                    res.getString("id_kostum"),
-                    res.getString("nama_kostum"),
-                    res.getString("kategori"),
-                    res.getInt("stok"),
-                    res.getString("ukuran"),
-                    "Rp " + String.format("%,.0f", res.getDouble("harga_sewa")),
-                    res.getString("status"),
-                    "Aksi"
-                });
+        worker.addPropertyChangeListener(evt -> {
+            if ("state".equals(evt.getPropertyName())
+                    && evt.getNewValue() == SwingWorker.StateValue.DONE) {
+                try {
+                    List<Kostum> list = worker.get();
+                    for (Kostum k : list) {
+                        model.addRow(new Object[]{
+                                k.getId(),
+                                k.getNama(),
+                                k.getKategori(),
+                                k.getStok(),
+                                k.getUkuran(),
+                                "Rp " + String.format("%,.0f", k.getHarga()),
+                                "Aksi"
+                        });
+                    }
+                    applyResponsiveTable();
+                } catch (Exception e) {
+                    JOptionPane.showMessageDialog(this, e.getMessage());
+                }
             }
-
-        } catch (SQLException e) {
-            JOptionPane.showMessageDialog(this, e.getMessage());
-        }
-    }
-
-    private void search() {
-        loadData(txtSearch.getText().trim());
+        });
     }
 
     // =========================
-    // RESPONSIVE TABLE
+    // RESPONSIVE
     // =========================
     private void applyResponsiveTable() {
         Window w = SwingUtilities.getWindowAncestor(this);
@@ -177,7 +218,6 @@ public class PanelProduk extends JPanel {
             showColumn(tcm, 5, 120);
             showColumn(tcm, 6, 100);
         }
-        revalidate();
     }
 
     private void hideColumn(TableColumnModel tcm, int index) {
@@ -193,7 +233,7 @@ public class PanelProduk extends JPanel {
     }
 
     // =========================
-    // ZEBRA RENDERER
+    // RENDERER
     // =========================
     class ZebraRenderer extends DefaultTableCellRenderer {
         @Override
@@ -204,24 +244,22 @@ public class PanelProduk extends JPanel {
             super.getTableCellRendererComponent(
                     table, value, isSelected, hasFocus, row, column);
 
-            if (isSelected) {
-                setBackground(new Color(200, 220, 255));
-            } else {
-                setBackground(row % 2 == 0
-                        ? Color.WHITE
-                        : new Color(245, 248, 250));
-            }
+            setBackground(isSelected
+                    ? new Color(200, 220, 255)
+                    : (row % 2 == 0 ? Color.WHITE : new Color(245, 248, 250))
+            );
             return this;
         }
     }
 
     // =========================
-    // AKSI
+    // AKSI (EDIT & HAPUS REAL)
     // =========================
     class ActionRenderer extends JButton implements TableCellRenderer {
         public ActionRenderer() {
             setText("Aksi");
         }
+
         @Override
         public Component getTableCellRendererComponent(
                 JTable table, Object value, boolean isSelected,
@@ -236,22 +274,24 @@ public class PanelProduk extends JPanel {
         public ActionEditor() {
             button.addActionListener(e -> {
                 int row = table.getEditingRow();
-                String status = model.getValueAt(row, 6).toString();
+                fireEditingStopped();
 
-                String[] opsi = status.equalsIgnoreCase("Disewa")
-                        ? new String[]{"Edit"}
-                        : new String[]{"Edit", "Hapus"};
+                String id = model.getValueAt(row, 0).toString();
+                String[] opsi = {"Edit", "Hapus"};
 
                 int pilih = JOptionPane.showOptionDialog(
-                        table, "Pilih aksi:", "Aksi Kostum",
-                        JOptionPane.DEFAULT_OPTION, JOptionPane.PLAIN_MESSAGE,
-                        null, opsi, opsi[0]
+                        PanelProduk.this,
+                        "Pilih aksi untuk kostum " + id,
+                        "Aksi Produk",
+                        JOptionPane.DEFAULT_OPTION,
+                        JOptionPane.PLAIN_MESSAGE,
+                        null,
+                        opsi,
+                        opsi[0]
                 );
 
-                if (pilih == 0) editProduk(row);
-                else if (pilih == 1) hapusProduk(row);
-
-                fireEditingStopped();
+                if (pilih == 0) editDialog(row);
+                if (pilih == 1) hapusData(id);
             });
         }
 
@@ -267,20 +307,24 @@ public class PanelProduk extends JPanel {
         }
     }
 
-    private void hapusProduk(int row) {
-        try {
-            Connection conn = DBConfig.getConnection();
-            PreparedStatement pst =
-                    conn.prepareStatement("DELETE FROM kostum WHERE id_kostum=?");
-            pst.setString(1, model.getValueAt(row, 0).toString());
-            pst.executeUpdate();
-            loadData();
-        } catch (SQLException e) {
-            JOptionPane.showMessageDialog(this, e.getMessage());
+    // =========================
+    // EDIT & HAPUS
+    // =========================
+    private void hapusData(String id) {
+        int konfirmasi = JOptionPane.showConfirmDialog(
+                this,
+                "Yakin ingin menghapus data?",
+                "Konfirmasi",
+                JOptionPane.YES_NO_OPTION
+        );
+
+        if (konfirmasi == JOptionPane.YES_OPTION) {
+            controller.hapus(id);
+            refresh();
         }
     }
 
-    private void editProduk(int row) {
+    private void editDialog(int row) {
         JTextField txtNama = new JTextField(model.getValueAt(row, 1).toString());
         JTextField txtStok = new JTextField(model.getValueAt(row, 3).toString());
         JTextField txtHarga = new JTextField(
@@ -290,29 +334,27 @@ public class PanelProduk extends JPanel {
                         .trim()
         );
 
-        JPanel form = new JPanel(new GridLayout(0, 2, 10, 10));
-        form.add(new JLabel("Nama")); form.add(txtNama);
-        form.add(new JLabel("Stok")); form.add(txtStok);
-        form.add(new JLabel("Harga")); form.add(txtHarga);
+        JPanel panel = new JPanel(new GridLayout(0, 2, 10, 10));
+        panel.add(new JLabel("Nama"));
+        panel.add(txtNama);
+        panel.add(new JLabel("Stok"));
+        panel.add(txtStok);
+        panel.add(new JLabel("Harga"));
+        panel.add(txtHarga);
 
         int ok = JOptionPane.showConfirmDialog(
-                this, form, "Edit Kostum", JOptionPane.OK_CANCEL_OPTION
+                this, panel, "Edit Kostum", JOptionPane.OK_CANCEL_OPTION
         );
+
         if (ok != JOptionPane.OK_OPTION) return;
 
-        try {
-            Connection conn = DBConfig.getConnection();
-            PreparedStatement pst = conn.prepareStatement(
-                    "UPDATE kostum SET nama_kostum=?, stok=?, harga_sewa=? WHERE id_kostum=?"
-            );
-            pst.setString(1, txtNama.getText());
-            pst.setInt(2, Integer.parseInt(txtStok.getText()));
-            pst.setDouble(3, Double.parseDouble(txtHarga.getText()));
-            pst.setString(4, model.getValueAt(row, 0).toString());
-            pst.executeUpdate();
-            loadData();
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, e.getMessage());
-        }
+        Kostum k = new Kostum();
+        k.setId(model.getValueAt(row, 0).toString());
+        k.setNama(txtNama.getText());
+        k.setStok(Integer.parseInt(txtStok.getText()));
+        k.setHarga(Double.parseDouble(txtHarga.getText()));
+
+        controller.update(k);
+        refresh();
     }
 }

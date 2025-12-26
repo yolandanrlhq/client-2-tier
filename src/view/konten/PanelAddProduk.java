@@ -1,17 +1,20 @@
 package view.konten;
 
+import controller.ProdukController;
+import model.Kostum;
+import worker.AddProdukWorker;
+
 import javax.swing.*;
 import java.awt.*;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
 import net.miginfocom.swing.MigLayout;
-import config.DBConfig;
 
 public class PanelAddProduk extends JPanel {
 
     private JTextField txtID, txtNama, txtHarga;
     private JComboBox<String> cbKategori, cbUkuran;
     private JSpinner txtStok;
+
+    private final ProdukController controller = new ProdukController();
 
     public PanelAddProduk() {
         initializeUI();
@@ -20,8 +23,7 @@ public class PanelAddProduk extends JPanel {
     private void initializeUI() {
         setLayout(new MigLayout(
             "fillx, insets 40, wrap 2",
-            "[right,120!]15[grow,fill]",
-            "[]25[]15[]15[]15[]15[]15[]25[]"
+            "[right,120!]15[grow,fill]"
         ));
         setBackground(Color.WHITE);
 
@@ -66,70 +68,66 @@ public class PanelAddProduk extends JPanel {
         add(btnSimpan, "span 2, center, w 240!, h 45!");
     }
 
-    // =========================
-    // SIMPAN DATA + PROGRESS %
-    // =========================
     private void simpanAsync(JButton btn) {
 
-        JDialog dialog = new JDialog(
-            SwingUtilities.getWindowAncestor(this),
-            "Memproses...",
-            Dialog.ModalityType.MODELESS   // 🔥 penting: TIDAK MEMBLOK UI
-        );
+        Kostum k = new Kostum();
+        k.setId(txtID.getText());
+        k.setNama(txtNama.getText());
+        k.setKategori(cbKategori.getSelectedItem().toString());
+        k.setStok((int) txtStok.getValue());
+        k.setUkuran(cbUkuran.getSelectedItem().toString());
+        k.setHarga(Double.parseDouble(txtHarga.getText()));
 
-        JProgressBar bar = new JProgressBar(0, 100);
-        bar.setStringPainted(true);
+       
 
-        JLabel lbl = new JLabel("Menyimpan data...");
-        lbl.setFont(new Font("Inter", Font.PLAIN, 14));
+        // ===== SATU-SATUNYA deklarasi bar =====
+JProgressBar bar = new JProgressBar(0, 100);
+bar.setStringPainted(true);
+bar.setPreferredSize(new Dimension(300, 22));
 
-        JPanel panel = new JPanel(new BorderLayout(10,10));
-        panel.setBorder(BorderFactory.createEmptyBorder(20,20,20,20));
-        panel.add(lbl, BorderLayout.NORTH);
-        panel.add(bar, BorderLayout.CENTER);
+// ===== LABEL =====
+JLabel lblInfo = new JLabel("Menyimpan data kostum...");
+lblInfo.setFont(new Font("Inter", Font.PLAIN, 14));
 
-        dialog.setContentPane(panel);
+// ===== PANEL KONTEN =====
+JPanel content = new JPanel(new BorderLayout(10, 10));
+content.setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20));
+content.add(lblInfo, BorderLayout.NORTH);
+content.add(bar, BorderLayout.CENTER);
+
+// ===== DIALOG =====
+JDialog dialog = new JDialog(
+    SwingUtilities.getWindowAncestor(this),
+    "Memproses...",
+    Dialog.ModalityType.MODELESS
+);
+dialog.setContentPane(content);
+dialog.pack();
+dialog.setMinimumSize(new Dimension(360, 120));
+dialog.setLocationRelativeTo(this);
+dialog.setResizable(false);
+
+        dialog.add(bar);
         dialog.pack();
         dialog.setLocationRelativeTo(this);
 
-        SwingWorker<Void, Void> worker = new SwingWorker<>() {
+        AddProdukWorker worker = controller.simpanAsync(k);
 
-            @Override
-            protected Void doInBackground() throws Exception {
-
-                // ===== SIMULASI PROSES 5 DETIK =====
-                for (int i = 0; i <= 100; i += 5) {
-                    Thread.sleep(250); // 5 detik total
-                    setProgress(i);
-                }
-
-                // ===== SIMPAN DATABASE =====
-                Connection conn = DBConfig.getConnection();
-                String sql = """
-                    INSERT INTO kostum
-                    (id_kostum, nama_kostum, kategori, stok, ukuran, harga_sewa, status)
-                    VALUES (?, ?, ?, ?, ?, ?, 'Tersedia')
-                """;
-
-                PreparedStatement pst = conn.prepareStatement(sql);
-                pst.setString(1, txtID.getText());
-                pst.setString(2, txtNama.getText());
-                pst.setString(3, cbKategori.getSelectedItem().toString());
-                pst.setInt(4, (int) txtStok.getValue());
-                pst.setString(5, cbUkuran.getSelectedItem().toString());
-                pst.setDouble(6, Double.parseDouble(txtHarga.getText()));
-                pst.executeUpdate();
-
-                return null;
+        // progress
+        worker.addPropertyChangeListener(evt -> {
+            if ("progress".equals(evt.getPropertyName())) {
+                bar.setValue((Integer) evt.getNewValue());
             }
 
-            @Override
-            protected void done() {
+            // 🔥 INI PENGGANTI addDoneListener
+            if ("state".equals(evt.getPropertyName())
+                    && evt.getNewValue() == SwingWorker.StateValue.DONE) {
+
                 dialog.dispose();
                 btn.setEnabled(true);
 
                 try {
-                    get();
+                    worker.get(); // tangkap exception jika ada
                     JOptionPane.showMessageDialog(
                         PanelAddProduk.this,
                         "Kostum berhasil didaftarkan!"
@@ -138,15 +136,9 @@ public class PanelAddProduk extends JPanel {
                 } catch (Exception ex) {
                     JOptionPane.showMessageDialog(
                         PanelAddProduk.this,
-                        "Gagal: " + ex.getMessage()
+                        "Gagal menyimpan: " + ex.getMessage()
                     );
                 }
-            }
-        };
-
-        worker.addPropertyChangeListener(evt -> {
-            if ("progress".equals(evt.getPropertyName())) {
-                bar.setValue((Integer) evt.getNewValue());
             }
         });
 

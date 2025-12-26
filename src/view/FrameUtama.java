@@ -5,8 +5,8 @@ import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.List;
 import javax.swing.*;
+
 import model.MenuItem;
-import net.miginfocom.swing.MigLayout;
 import view.konten.*;
 import view.menu.PanelMenu;
 
@@ -15,71 +15,76 @@ public class FrameUtama extends JFrame {
     private CardLayout cardLayout;
     private JPanel panelKonten;
     private PanelMenu panelMenu;
-    private MigLayout mainLayout;
+
+    private JLayeredPane layeredPane;
     private JButton btnHamburgerOverlay;
 
-    // PANEL KONTEN (TETAP AMAN, TIDAK DIHAPUS)
     private PanelDashboard pDashboard;
     private PanelProduk pProduk;
     private PanelPesanan pPesanan;
     private PanelPelanggan pPelanggan;
     private PanelAddPesanan pAddPesanan;
 
-    private boolean isMenuShow = true;
+    private boolean isMenuShow = false;
 
     public FrameUtama() {
         initializeUI();
         setupPanelKonten();
         setupPanelMenu();
-        setupFloatingButton(); 
+        setupFloatingButton();
         addComponents();
         setupResponsiveListener();
-        
         refreshLayout();
     }
 
+    // =========================
+    // INIT UI
+    // =========================
     private void initializeUI() {
         setTitle("Sistem Penyewaan Kostum");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setPreferredSize(new Dimension(1280, 720));
         setMinimumSize(new Dimension(600, 500));
-        mainLayout = new MigLayout("fill, insets 0, gap 0", "[280!]0[grow]", "[grow]");
-        setLayout(mainLayout);
+
+        layeredPane = new JLayeredPane();
+        layeredPane.setLayout(null);
+        setContentPane(layeredPane);
     }
 
+    // =========================
+    // HAMBURGER BUTTON
+    // =========================
     private void setupFloatingButton() {
         btnHamburgerOverlay = new JButton("≡");
         btnHamburgerOverlay.setFont(new Font("Inter", Font.BOLD, 22));
         btnHamburgerOverlay.setFocusable(false);
-        btnHamburgerOverlay.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        
+        btnHamburgerOverlay.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         btnHamburgerOverlay.setBackground(Color.WHITE);
-        btnHamburgerOverlay.setForeground(new Color(0, 48, 73));
         btnHamburgerOverlay.setBorder(BorderFactory.createLineBorder(new Color(230, 230, 230)));
-        
+
         btnHamburgerOverlay.addActionListener(e -> toggleMenu());
-        
-        // Gunakan DRAG_LAYER agar selalu di depan konten, tapi di bawah sidebar jika diperlukan
-        getLayeredPane().add(btnHamburgerOverlay, JLayeredPane.DRAG_LAYER);
-        btnHamburgerOverlay.setBounds(15, 15, 50, 45);
-        btnHamburgerOverlay.setVisible(false);
+
+        layeredPane.add(btnHamburgerOverlay, JLayeredPane.DRAG_LAYER);
     }
 
+    // =========================
+    // PANEL KONTEN
+    // =========================
     private void setupPanelKonten() {
         cardLayout = new CardLayout();
         panelKonten = new JPanel(cardLayout);
-        
-        // Klik di konten otomatis tutup menu (Hanya di mode small)
+
+        // 🔥 KUNCI UTAMA
         panelKonten.addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
                 if (getWidth() < 900 && isMenuShow) {
-                    toggleMenu();
+                    isMenuShow = false;
+                    refreshLayout();
                 }
             }
         });
 
-        // INISIALISASI SEMUA PANEL (LENGKAP!)
         pDashboard = new PanelDashboard();
         pProduk = new PanelProduk();
         pPesanan = new PanelPesanan();
@@ -95,8 +100,12 @@ public class FrameUtama extends JFrame {
         panelKonten.add(new PanelAddPelanggan(), "add_pelanggan");
     }
 
+    // =========================
+    // PANEL MENU
+    // =========================
     private void setupPanelMenu() {
         List<MenuItem> listMenu = new ArrayList<>();
+
         listMenu.add(new MenuItem("Dashboard", "dashboard"));
 
         MenuItem menuProduk = new MenuItem("Produk");
@@ -115,82 +124,81 @@ public class FrameUtama extends JFrame {
         listMenu.add(menuPelanggan);
 
         panelMenu = new PanelMenu(listMenu, cardLayout, panelKonten);
-        
-        // PENTING: Kita jangan masukkan panelMenu ke LayeredPane secara permanen. 
-        // Biarkan MigLayout yang atur di refreshLayout.
     }
 
     private void addComponents() {
-        add(panelMenu, "growy");
-        add(panelKonten, "grow");
+        layeredPane.add(panelKonten, JLayeredPane.DEFAULT_LAYER);
+        layeredPane.add(panelMenu, JLayeredPane.POPUP_LAYER);
     }
 
+    // =========================
+    // TOGGLE MENU
+    // =========================
     public void toggleMenu() {
         isMenuShow = !isMenuShow;
         refreshLayout();
     }
 
+    // =========================
+    // RESPONSIVE LAYOUT (FINAL FIX)
+    // =========================
     private void refreshLayout() {
-        if (getWidth() < 900) {
-            // --- MODE SMALL (MOBILE) ---
-            
-            // 1. Hilangkan pembagian kolom (Reset ke 1 kolom saja untuk konten)
-            mainLayout.setColumnConstraints("[grow]"); 
-            
+        int w = getWidth();
+        int h = getHeight();
+
+        panelKonten.setBounds(0, 0, w, h);
+
+        if (w < 900) {
             if (isMenuShow) {
-                // Sidebar melayang di atas konten (pos 0 0)
-                mainLayout.setComponentConstraints(panelMenu, "pos 0 0, w 280!, h 100%, external");
+                panelMenu.setBounds(0, 0, 280, h);
                 panelMenu.setVisible(true);
-                btnHamburgerOverlay.setVisible(false); 
+                layeredPane.moveToFront(panelMenu);
+                btnHamburgerOverlay.setVisible(false);
             } else {
-                // Sidebar dibuang jauh ke luar layar
-                mainLayout.setComponentConstraints(panelMenu, "pos -280 0, w 280!, h 100%, external");
                 panelMenu.setVisible(false);
                 btnHamburgerOverlay.setVisible(true);
             }
         } else {
-            // --- MODE NORMAL (DESKTOP) ---
-            isMenuShow = true; 
-            btnHamburgerOverlay.setVisible(false);
             panelMenu.setVisible(true);
-            
-            // 2. Kembalikan pembagian 2 kolom (Sidebar 280px + Konten grow)
-            mainLayout.setColumnConstraints("[280!]0[grow]");
-            mainLayout.setComponentConstraints(panelMenu, "growy");
+            panelMenu.setBounds(0, 0, 280, h);
+            panelKonten.setBounds(280, 0, w - 280, h);
+            btnHamburgerOverlay.setVisible(false);
+            isMenuShow = true;
         }
-        
-        // Jaga posisi tombol hamburger di pojok kiri atas
+
         btnHamburgerOverlay.setBounds(15, 15, 50, 45);
-        
-        // Refresh tampilan secara paksa
-        revalidate();
-        repaint();
+
+        layeredPane.revalidate();
+        layeredPane.repaint();
     }
 
+    // =========================
+    // RESIZE LISTENER
+    // =========================
     private void setupResponsiveListener() {
-        this.addComponentListener(new ComponentAdapter() {
+        addComponentListener(new ComponentAdapter() {
             @Override
             public void componentResized(ComponentEvent e) {
-                if (getWidth() < 900 && isMenuShow) {
-                    isMenuShow = false;
-                }
+                if (getWidth() < 900) isMenuShow = false;
                 refreshLayout();
             }
         });
     }
 
+    // =========================
+    // GANTI PANEL
+    // =========================
     public void gantiPanel(String key) {
         cardLayout.show(panelKonten, key);
-        
-        // TUTUP OTOMATIS JIKA PILIH MENU DI LAYAR KECIL
-        if (getWidth() < 900 && isMenuShow) {
-            toggleMenu();
+
+        if (getWidth() < 900) {
+            isMenuShow = false;
+            refreshLayout();
         }
 
-        // REFRESH DATA TETAP AMAN
         switch (key) {
             case "dashboard" -> pDashboard.refreshData();
-            case "produk" -> pProduk.loadData("");
+            case "produk" -> pProduk.refresh();
             case "pesanan" -> pPesanan.loadData("");
             case "add_pesanan" -> pAddPesanan.loadKostumCombo();
             case "pelanggan" -> pPelanggan.loadData();
@@ -199,7 +207,7 @@ public class FrameUtama extends JFrame {
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-            try { com.formdev.flatlaf.FlatLightLaf.setup(); } catch (Exception e) {}
+            try { com.formdev.flatlaf.FlatLightLaf.setup(); } catch (Exception ignored) {}
             FrameUtama frame = new FrameUtama();
             frame.pack();
             frame.setLocationRelativeTo(null);
