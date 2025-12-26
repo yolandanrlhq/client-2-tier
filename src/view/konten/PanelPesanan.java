@@ -2,12 +2,16 @@ package view.konten;
 
 import java.awt.*;
 import java.awt.event.*;
+import java.sql.Connection;
+import java.sql.ResultSet;
 import java.util.List;
 import javax.swing.*;
 import javax.swing.table.*;
+
+import config.DBConfig;
 import net.miginfocom.swing.MigLayout;
 import model.Pesanan;
-import controller.PesananController; // Import Controller
+import controller.PesananController;
 
 public class PanelPesanan extends JPanel {
 
@@ -16,8 +20,6 @@ public class PanelPesanan extends JPanel {
     private JTextField txtSearch;
     private JLabel title;
     private MigLayout mainLayout;
-    
-    // Hapus DAO, ganti dengan Controller
     private PesananController controller;
 
     public PanelPesanan() {
@@ -89,14 +91,10 @@ public class PanelPesanan extends JPanel {
         add(scrollPane, "grow");
     }
 
-    // SEKARANG: View tinggal minta ke Controller
     public void loadData(String keyword) {
         controller.muatData(keyword);
     }
 
-    /**
-     * Method ini akan dipanggil oleh Controller setelah LoadPesananWorker selesai
-     */
     public void updateTabel(List<Pesanan> listPesanan) {
         model.setRowCount(0);
         for (Pesanan p : listPesanan) {
@@ -114,48 +112,93 @@ public class PanelPesanan extends JPanel {
     }
 
     private void hapusPesanan(int row) {
-        // Ambil ID dari tabel
         Object idObj = model.getValueAt(row, 0);
-        
-        // Serahkan tugas hapus ke controller
         if (idObj != null) {
-            // Jika ID berupa String (misal: "TRX001")
-            String idStr = idObj.toString(); 
-            // Kalau di database ID-mu Integer, nanti Controller yang sesuaikan
-            controller.hapusData(Integer.parseInt(idStr)); 
+            controller.hapusDataString(idObj.toString()); 
         }
     }
 
     private void editPesanan(int row) {
-        // Logika membuka Form Edit tetap di sini (View)
-        // Namun saat tombol "Update" diklik di form, panggil:
-        // controller.ubahData(pesananBaru);
+        try {
+            // 1. Ambil data dari tabel
+            String idSewa = model.getValueAt(row, 0).toString();
+            String penyewaLama = model.getValueAt(row, 1).toString();
+            String namaKostumLama = model.getValueAt(row, 2).toString();
+            
+            // Fix: Bersihkan angka dari koma/titik sebelum parse
+            String jmlRaw = model.getValueAt(row, 3).toString().replaceAll("[^0-9]", "");
+            int jumlahLama = Integer.parseInt(jmlRaw);
+            String statusLama = model.getValueAt(row, 6).toString();
+
+            // 2. Siapkan Komponen Form
+            JTextField txtPenyewa = new JTextField(penyewaLama);
+            JSpinner txtJumlah = new JSpinner(new SpinnerNumberModel(jumlahLama, 1, 100, 1));
+            JComboBox<String> cbStatus = new JComboBox<>(new String[]{"Disewa", "Selesai", "Dibatalkan"});
+            cbStatus.setSelectedItem(statusLama);
+
+            JComboBox<String> cbKostum = new JComboBox<>();
+            cbKostum.addItem(namaKostumLama); 
+
+            // Isi ComboBox Kostum dari DB
+            try (Connection conn = DBConfig.getConnection()) {
+                ResultSet resK = conn.createStatement().executeQuery("SELECT id_kostum, nama_kostum FROM kostum WHERE stok > 0");
+                while (resK.next()) {
+                    String item = resK.getString("id_kostum") + " - " + resK.getString("nama_kostum");
+                    if (!resK.getString("nama_kostum").equals(namaKostumLama)) {
+                        cbKostum.addItem(item);
+                    }
+                }
+            }
+
+            // 3. Tampilkan Dialog
+            JPanel form = new JPanel(new MigLayout("fillx, insets 10", "[right]10[grow, fill]"));
+            form.add(new JLabel("Penyewa:"));    form.add(txtPenyewa, "wrap");
+            form.add(new JLabel("Ganti Kostum:")); form.add(cbKostum, "wrap");
+            form.add(new JLabel("Jumlah Unit:"));  form.add(txtJumlah, "wrap");
+            form.add(new JLabel("Status:"));       form.add(cbStatus, "wrap");
+
+            int ok = JOptionPane.showConfirmDialog(this, form, "Edit Transaksi " + idSewa, JOptionPane.OK_CANCEL_OPTION);
+
+            if (ok == JOptionPane.OK_OPTION) {
+                Pesanan p = new Pesanan();
+                p.setIdSewa(idSewa);
+                p.setNamaPenyewa(txtPenyewa.getText());
+                p.setJumlah((int) txtJumlah.getValue());
+                p.setStatus(cbStatus.getSelectedItem().toString());
+                
+                String selectedK = cbKostum.getSelectedItem().toString();
+                
+                // FIX LOGIKA ID KOSTUM:
+                if (selectedK.contains(" - ")) {
+                    // Jika user pilih kostum baru dari list
+                    p.setIdKostum(selectedK.split(" - ")[0].trim());
+                } else {
+                    // Jika user tidak ganti kostum, ambil ID aslinya via Service agar tidak NULL
+                    String idLama = controller.getService().getIdKostum(idSewa);
+                    p.setIdKostum(idLama);
+                }
+                
+                // Hitung ulang total biaya (opsional, tergantung logic bisnis anda)
+                // Jika harga per hari berubah, p.setTotalBiaya(...) bisa ditambahkan di sini.
+
+                controller.ubahData(p);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Gagal memproses data: " + e.getMessage());
+        }
     }
 
-    // --- SISA KODE (Responsive & Renderers) ---
     private void applyTableResponsiveness() {
         Window window = SwingUtilities.getWindowAncestor(this);
         if (window == null) return;
         int w = window.getWidth();
-        if (w <= 0) return;
         TableColumnModel tcm = table.getColumnModel();
 
         if (w <= 768) {
-            mainLayout.setLayoutConstraints("fill, insets 15");
-            title.setFont(new Font("Inter", Font.BOLD, 20));
             hideColumn(tcm, 3); hideColumn(tcm, 4); hideColumn(tcm, 5);
-            setColumnWidth(tcm, 0, 70); setColumnWidth(tcm, 1, 120); setColumnWidth(tcm, 2, 120);
-            setColumnWidth(tcm, 6, 90); setColumnWidth(tcm, 7, 70);
-        } else if (w <= 1200) {
-            mainLayout.setLayoutConstraints("fill, insets 30 4% 30 4%");
-            title.setFont(new Font("Inter", Font.BOLD, 24));
-            showColumn(tcm, 3, 60); showColumn(tcm, 4, 110); hideColumn(tcm, 5);
-            setColumnWidth(tcm, 6, 100); setColumnWidth(tcm, 7, 80);
         } else {
-            mainLayout.setLayoutConstraints("fill, insets 40 6% 40 6%");
-            title.setFont(new Font("Inter", Font.BOLD, 32));
             showColumn(tcm, 3, 70); showColumn(tcm, 4, 130); showColumn(tcm, 5, 120);
-            setColumnWidth(tcm, 6, 110); setColumnWidth(tcm, 7, 90);
         }
         this.revalidate();
     }
@@ -167,9 +210,7 @@ public class PanelPesanan extends JPanel {
     }
 
     private void hideColumn(TableColumnModel tcm, int index) {
-        tcm.getColumn(index).setMinWidth(0);
-        tcm.getColumn(index).setMaxWidth(0);
-        tcm.getColumn(index).setPreferredWidth(0);
+        setColumnWidth(tcm, index, 0);
     }
 
     private void showColumn(TableColumnModel tcm, int index, int width) {
@@ -182,10 +223,18 @@ public class PanelPesanan extends JPanel {
         @Override
         public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
             super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+            
+            // Cek status untuk styling warna baris
+            String status = table.getValueAt(row, 6).toString();
+            
             if (isSelected) {
                 setBackground(new Color(200, 220, 255));
             } else {
-                setBackground(row % 2 == 0 ? Color.WHITE : new Color(245, 248, 250));
+                if ("Selesai".equalsIgnoreCase(status)) {
+                    setBackground(new Color(240, 240, 240)); // Abu-abu jika selesai
+                } else {
+                    setBackground(row % 2 == 0 ? Color.WHITE : new Color(245, 248, 250));
+                }
             }
             return this;
         }
