@@ -1,6 +1,8 @@
 package dao;
-import java.util.Map;
+
+import java.util.List;
+import model.DashboardModel;
 
 public interface DashboardDao {
-    Map<String, Double> getStatistics();
+    DashboardModel getStatistics();
 }

@@ -17,13 +17,13 @@ public class LoadPesananWorker extends SwingWorker<List<Pesanan>, Void> {
 
     @Override
     protected List<Pesanan> doInBackground() throws Exception {
-        return service.muatSemuaData(keyword); // Kerja keras di background
+        return service.muatSemuaData(keyword); 
     }
 
     @Override
     protected void done() {
         try {
-            callback.accept(get()); // Kirim hasil ke UI kalau sudah selesai
+            callback.accept(get()); 
         } catch (Exception e) {
             e.printStackTrace();
         }

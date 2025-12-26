@@ -16,7 +16,9 @@ public class PanelAddPesanan extends JPanel {
     private JSpinner txtJumlah;
     private JButton btnSimpan;
     private double hargaPerUnit = 0;
-    private PesananController controller = new PesananController();
+    
+    // Perbaikan: Inisialisasi controller dengan parameter null (karena view utama adalah PanelPesanan)
+    private PesananController controller = new PesananController(null);
     private FrameUtama frameUtama;
 
     private MigLayout mainLayout;
@@ -37,7 +39,6 @@ public class PanelAddPesanan extends JPanel {
             @Override
             public void componentResized(ComponentEvent e) { refreshLayout(); }
         });
-        
     }
 
     private void setupStaticComponents() {
@@ -83,12 +84,11 @@ public class PanelAddPesanan extends JPanel {
         progressBar.setIndeterminate(true);
         JDialog loadingDialog = createProgressDialog(progressBar);
 
-        // 3. Jalankan via Controller
+        // 3. Jalankan via Controller (Gunakan method simpanData)
         btnSimpan.setEnabled(false);
-        controller.simpanPesanan(p, () -> {
+        controller.simpanData(p, () -> {
             loadingDialog.dispose();
             btnSimpan.setEnabled(true);
-            JOptionPane.showMessageDialog(this, "Pesanan Berhasil Disimpan!");
             resetForm();
             
             // PINDAH KE DAFTAR PESANAN OTOMATIS
@@ -100,28 +100,38 @@ public class PanelAddPesanan extends JPanel {
         loadingDialog.setVisible(true);
     }
 
-    // Helper methods (load combo, hitung total, dsb tetap sama namun pastikan rapi)
     public void loadPelangganCombo() {
         cbPenyewa.removeAllItems();
         cbPenyewa.addItem("-- Pilih Pelanggan --");
-        try (Connection conn = DBConfig.getConnection(); Statement st = conn.createStatement(); ResultSet rs = st.executeQuery("SELECT nama_pelanggan FROM pelanggan")) {
+        try (Connection conn = DBConfig.getConnection(); 
+             Statement st = conn.createStatement(); 
+             ResultSet rs = st.executeQuery("SELECT nama_pelanggan FROM pelanggan")) {
             while (rs.next()) cbPenyewa.addItem(rs.getString("nama_pelanggan"));
         } catch (SQLException e) { e.printStackTrace(); }
-    }
+    }    
 
     public void loadKostumCombo() {
         cbKostum.removeAllItems();
         cbKostum.addItem("-- Pilih Kostum --");
-        try (Connection conn = DBConfig.getConnection(); Statement st = conn.createStatement(); ResultSet rs = st.executeQuery("SELECT id_kostum, nama_kostum FROM kostum WHERE stok > 0")) {
+        try (Connection conn = DBConfig.getConnection(); 
+             Statement st = conn.createStatement(); 
+             ResultSet rs = st.executeQuery("SELECT id_kostum, nama_kostum FROM kostum WHERE stok > 0")) {
             while (rs.next()) cbKostum.addItem(rs.getString("id_kostum") + " - " + rs.getString("nama_kostum"));
         } catch (SQLException e) { e.printStackTrace(); }
     }
 
     private void ambilHargaKostum() {
         Object selected = cbKostum.getSelectedItem();
-        if (selected == null || selected.toString().equals("-- Pilih Kostum --")) { hargaPerUnit = 0; hitungTotal(); return; }
+        if (selected == null || selected.toString().equals("-- Pilih Kostum --")) { 
+            hargaPerUnit = 0; 
+            hitungTotal(); 
+            return; 
+        }
+        
         String idK = selected.toString().split(" - ")[0];
-        try (Connection conn = DBConfig.getConnection(); PreparedStatement pst = conn.prepareStatement("SELECT harga_sewa FROM kostum WHERE id_kostum = ?")) {
+        // Mengambil harga langsung dari DB (Bisa dipindah ke KostumDao nanti)
+        try (Connection conn = DBConfig.getConnection(); 
+             PreparedStatement pst = conn.prepareStatement("SELECT harga_sewa FROM kostum WHERE id_kostum = ?")) {
             pst.setString(1, idK);
             ResultSet rs = pst.executeQuery();
             if (rs.next()) hargaPerUnit = rs.getDouble("harga_sewa");
@@ -135,8 +145,10 @@ public class PanelAddPesanan extends JPanel {
     }
 
     private void resetForm() {
-        txtIDSewa.setText(""); cbPenyewa.setSelectedIndex(0);
-        cbKostum.setSelectedIndex(0); txtJumlah.setValue(1);
+        txtIDSewa.setText(""); 
+        cbPenyewa.setSelectedIndex(0);
+        cbKostum.setSelectedIndex(0); 
+        txtJumlah.setValue(1);
         txtTotal.setText("");
     }
 
@@ -160,13 +172,13 @@ public class PanelAddPesanan extends JPanel {
         removeAll();
         if (w <= 768) {
             mainLayout.setLayoutConstraints("fillx, insets 20");
-            add(lblTitle, "center, wrap 30");
-            add(new JLabel("ID Sewa")); add(txtIDSewa, "growx, wrap 15");
+            add(lblTitle, "span 2, center, wrap 30");
+            add(new JLabel("ID Sewa")); add(txtIDSewa, "wrap 15");
             add(new JLabel("Penyewa")); add(cbPenyewa, "growx, wrap 15");
             add(new JLabel("Kostum")); add(cbKostum, "growx, wrap 15");
             add(new JLabel("Jumlah")); add(txtJumlah, "w 100!, wrap 15");
             add(new JLabel("Total")); add(txtTotal, "growx, wrap 30");
-            add(btnSimpan, "growx, h 45!");
+            add(btnSimpan, "span2, center, growx, h 45!");
         } else {
             mainLayout.setLayoutConstraints("fillx, insets 80 50 80 50");
             add(lblTitle, "span 2, center, wrap 40");

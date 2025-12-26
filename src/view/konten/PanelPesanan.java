@@ -6,11 +6,8 @@ import java.util.List;
 import javax.swing.*;
 import javax.swing.table.*;
 import net.miginfocom.swing.MigLayout;
-import worker.pesanan.LoadPesananWorker;
-// Import Model dan DAO
 import model.Pesanan;
-import dao.PesananDao;
-import dao.mysql.PesananDaoMySql;
+import controller.PesananController; // Import Controller
 
 public class PanelPesanan extends JPanel {
 
@@ -20,10 +17,13 @@ public class PanelPesanan extends JPanel {
     private JLabel title;
     private MigLayout mainLayout;
     
-    // Inisialisasi DAO (Standard Dosen)
-    private PesananDao dao = new PesananDaoMySql();
+    // Hapus DAO, ganti dengan Controller
+    private PesananController controller;
 
     public PanelPesanan() {
+        // Inisialisasi controller
+        this.controller = new PesananController(this);
+        
         initializeUI();
         loadData(""); 
 
@@ -89,47 +89,50 @@ public class PanelPesanan extends JPanel {
         add(scrollPane, "grow");
     }
 
+    // SEKARANG: View tinggal minta ke Controller
     public void loadData(String keyword) {
-        model.setRowCount(0);
-        // Panggil Worker, bukan DAO langsung
-        new LoadPesananWorker(keyword, (listPesanan) -> {
-            for (Pesanan p : listPesanan) {
-                model.addRow(new Object[]{
-                    p.getIdSewa(),
-                    p.getNamaPenyewa(),
-                    p.getNamaKostum(),
-                    p.getJumlah(),
-                    p.getTglPinjam(),
-                    "Rp " + String.format("%,.0f", p.getTotalBiaya()),
-                    p.getStatus(),
-                    "Aksi"
-                });
-            }
-        }).execute();
+        controller.muatData(keyword);
     }
 
-    private void hapusPesanan(int row) {
-        String id = model.getValueAt(row, 0).toString();
-        int ok = JOptionPane.showConfirmDialog(this, "Hapus transaksi ini?", "Konfirmasi", JOptionPane.YES_NO_OPTION);
-        if (ok == JOptionPane.YES_OPTION) {
-            try {
-                dao.delete(id); // Panggil fungsi hapus di DAO
-                loadData("");
-                JOptionPane.showMessageDialog(this, "Data berhasil dihapus!");
-            } catch (Exception e) {
-                JOptionPane.showMessageDialog(this, "Gagal hapus: " + e.getMessage());
-            }
+    /**
+     * Method ini akan dipanggil oleh Controller setelah LoadPesananWorker selesai
+     */
+    public void updateTabel(List<Pesanan> listPesanan) {
+        model.setRowCount(0);
+        for (Pesanan p : listPesanan) {
+            model.addRow(new Object[]{
+                p.getIdSewa(),
+                p.getNamaPenyewa(),
+                p.getNamaKostum(),
+                p.getJumlah(),
+                p.getTglPinjam(),
+                "Rp " + String.format("%,.0f", p.getTotalBiaya()),
+                p.getStatus(),
+                "Aksi"
+            });
         }
     }
 
-    // Untuk editPesanan, logikanya sama: Pindahkan bagian SQL ke DAO, lalu panggil dao.update(p)
-    private void editPesanan(int row) {
-        // ... Logika Form Input tetap di sini ...
-        // Tapi saat save, gunakan:
-        // dao.update(pesananBaru);
+    private void hapusPesanan(int row) {
+        // Ambil ID dari tabel
+        Object idObj = model.getValueAt(row, 0);
+        
+        // Serahkan tugas hapus ke controller
+        if (idObj != null) {
+            // Jika ID berupa String (misal: "TRX001")
+            String idStr = idObj.toString(); 
+            // Kalau di database ID-mu Integer, nanti Controller yang sesuaikan
+            controller.hapusData(Integer.parseInt(idStr)); 
+        }
     }
 
-    // --- SISA KODE (Responsive & Renderers) TETAP SAMA ---
+    private void editPesanan(int row) {
+        // Logika membuka Form Edit tetap di sini (View)
+        // Namun saat tombol "Update" diklik di form, panggil:
+        // controller.ubahData(pesananBaru);
+    }
+
+    // --- SISA KODE (Responsive & Renderers) ---
     private void applyTableResponsiveness() {
         Window window = SwingUtilities.getWindowAncestor(this);
         if (window == null) return;

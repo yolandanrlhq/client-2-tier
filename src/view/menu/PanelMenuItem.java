@@ -1,17 +1,15 @@
 package view.menu;
 
-import java.awt.Color;
-import java.awt.Font;
+import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
+import javax.swing.*;
 import net.miginfocom.swing.MigLayout;
 import model.MenuItem;
+import view.FrameUtama;
 
 public class PanelMenuItem extends JPanel {
 
-    // Warna-warna tema
     private static final Color BG_SIDEBAR = new Color(245, 247, 250);
     private static final Color BG_HOVER = new Color(224, 230, 235);
     private static final Color BG_SELECTED = new Color(234, 242, 235);
@@ -19,29 +17,39 @@ public class PanelMenuItem extends JPanel {
     private static final Color TEXT_SELECTED = new Color(131, 188, 160);
 
     private final String contentKey;
+    private final String judul;
     private boolean selected = false;
     private final JPanel panelContainerSubMenu;
     private final JLabel labelMenu;
     private final PanelMenu panelMenu;
+    private final MigLayout layout;
 
     public PanelMenuItem(MenuItem item, PanelMenu panelMenu) {
         this.panelMenu = panelMenu;
+        this.judul = item.getJudul();
         this.contentKey = item.getContentKey();
+        
         this.panelContainerSubMenu = new JPanel(new MigLayout("fillx, wrap 1, insets 0, gap 0"));
         this.panelContainerSubMenu.setOpaque(false);
 
-        setLayout(new MigLayout("insets 0 25 0 25", "[grow]", "[grow]"));
+        // Mengatur insets agar teks nempel ke kiri (gapleft 30 agar ada ruang manis di kiri)
+        this.layout = new MigLayout("insets 0 30 0 20, hidemode 3", "[grow]", "[grow]");
+        setLayout(this.layout);
         setBackground(BG_SIDEBAR);
+        setCursor(new Cursor(Cursor.HAND_CURSOR));
 
-        labelMenu = new JLabel(item.getJudul());
+        labelMenu = new JLabel(judul);
         labelMenu.setFont(new Font("Inter", Font.PLAIN, 14));
         labelMenu.setForeground(TEXT_NORMAL);
+
+        // Langsung tambahkan teks menu saja
         add(labelMenu, "aligny center");
 
-        // Bangun Sub-Menu jika ada
         if (item.hasSubMenuItem()) {
             for (MenuItem subItem : item.getSubMenuItems()) {
-                panelContainerSubMenu.add(new PanelMenuItem(subItem, panelMenu), "growx, h 35!");
+                // Untuk sub-menu, gap kiri ditambah sedikit agar ada hirarki (indentasi)
+                PanelMenuItem subPanel = new PanelMenuItem(subItem, panelMenu);
+                panelContainerSubMenu.add(subPanel, "growx, h 35!");
             }
         }
 
@@ -63,9 +71,17 @@ public class PanelMenuItem extends JPanel {
             @Override
             public void mousePressed(MouseEvent e) {
                 panelMenu.selectMenuItem(PanelMenuItem.this);
-                // Toggle sub-menu visibility
+                
+                if (contentKey != null && !contentKey.isEmpty()) {
+                    FrameUtama frame = (FrameUtama) SwingUtilities.getWindowAncestor(PanelMenuItem.this);
+                    if (frame != null && frame.getWidth() < 900) {
+                        frame.toggleMenu(); 
+                    }
+                }
+
                 if (panelContainerSubMenu.getComponentCount() > 0) {
-                    panelContainerSubMenu.setVisible(!panelContainerSubMenu.isVisible());
+                    boolean isNowVisible = !panelContainerSubMenu.isVisible();
+                    panelContainerSubMenu.setVisible(isNowVisible);
                     revalidate();
                 }
             }

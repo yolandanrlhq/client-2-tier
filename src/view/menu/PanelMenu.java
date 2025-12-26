@@ -1,15 +1,11 @@
 package view.menu;
 
-import java.awt.CardLayout;
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.Font;
+import java.awt.*;
 import java.util.List;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JSeparator;
+import javax.swing.*;
 import model.MenuItem;
 import net.miginfocom.swing.MigLayout;
+import view.FrameUtama;
 
 public class PanelMenu extends JPanel {
 
@@ -17,6 +13,9 @@ public class PanelMenu extends JPanel {
     private final JPanel panelKonten;
     private PanelMenuItem panelMenuItem;
     private PanelMenuItem panelDashboard = null;
+    
+    private JLabel labelJudul;
+    private JPanel panelJudul;
 
     public PanelMenu(List<MenuItem> listDaftarMenuItem, CardLayout cardLayout, JPanel panelKonten) {
         this.cardLayout = cardLayout;
@@ -28,33 +27,41 @@ public class PanelMenu extends JPanel {
     }
 
     private void initializeUI() {
-        // Menggunakan MigLayout untuk menyusun menu secara vertikal
+        // Menggunakan hidemode 3 agar komponen invisible tidak memakan space
         setLayout(new MigLayout("fillx, wrap 1, insets 0, gap 0, hidemode 3", "[grow]", ""));
+        setBackground(new Color(245, 247, 250));
         setPreferredSize(new Dimension(280, 0));
-        setBackground(new Color(245, 247, 250)); // Warna abu-abu sangat muda sesuai tema
 
-        // Judul Aplikasi di Sidebar
-        JPanel panelJudul = new JPanel(new MigLayout("insets 20 25 20 25"));
+        // Panel judul: Rata kiri sesuai request (Foto 1)
+        panelJudul = new JPanel(new MigLayout("insets 20 30 20 25", "[grow]")); // Insets kiri 30 agar sejajar teks menu
         panelJudul.setOpaque(false);
-        JLabel labelJudul = new JLabel("COSTUME RENTAL");
+
+        labelJudul = new JLabel("COSTUME RENTAL");
         labelJudul.setFont(new Font("Inter", Font.BOLD, 18));
         labelJudul.setForeground(new Color(0, 48, 73));
-        panelJudul.add(labelJudul);
+
+        panelJudul.add(labelJudul, "pushx, align left"); 
+        
         add(panelJudul, "growx");
-        add(new JSeparator(), "growx, gapbottom 10");
+        
+        // Pemisah dengan sedikit jarak bawah
+        JSeparator separator = new JSeparator();
+        separator.setForeground(new Color(230, 230, 230));
+        add(separator, "growx, gapbottom 15");
     }
 
     private void buildMenu(List<MenuItem> listDaftarMenuItem) {
         for (MenuItem menu : listDaftarMenuItem) {
-            // Membuat item menu
             PanelMenuItem itemPanel = new PanelMenuItem(menu, this);
-            add(itemPanel, "growx, h 45!");
+            // Tinggi tiap item menu diatur 50px agar enak diklik jari di layar sentuh/mobile
+            add(itemPanel, "growx, h 50!");
 
-            // Jika punya sub-menu (seperti 'Tambah Produk' di bawah 'Produk')
             if (menu.hasSubMenuItem()) {
                 JPanel panelSubMenu = itemPanel.getPanelCountainerSubMenu();
+                panelSubMenu.setName("sub"); 
+                // Indentasi untuk sub-menu tanpa icon
                 add(panelSubMenu, "growx, gapleft 20");
-                panelSubMenu.setVisible(false); // Sembunyikan dulu sampai diklik
+                panelSubMenu.setVisible(false);
             }
 
             if ("Dashboard".equals(menu.getJudul())) {
@@ -76,10 +83,15 @@ public class PanelMenu extends JPanel {
         clickedPanel.setSelectedByParent(true);
         panelMenuItem = clickedPanel;
 
-        // Pindah halaman jika ada contentKey
         String key = clickedPanel.getContentKey();
         if (key != null && !key.isEmpty()) {
-            cardLayout.show(panelKonten, key);
+            FrameUtama frame = (FrameUtama) SwingUtilities.getWindowAncestor(this);
+            if (frame != null) {
+                // gantiPanel akan menangani penutupan menu otomatis di layar kecil
+                frame.gantiPanel(key); 
+            } else {
+                cardLayout.show(panelKonten, key);
+            }
         }
     }
 }

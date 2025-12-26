@@ -4,7 +4,8 @@ import java.awt.*;
 import java.awt.event.*;
 import javax.swing.*;
 import net.miginfocom.swing.MigLayout;
-// Tidak perlu import DAO di sini
+import model.DashboardModel; // Import model
+import controller.DashboardController; // Import controller
 
 public class PanelDashboard extends JPanel {
 
@@ -12,6 +13,9 @@ public class PanelDashboard extends JPanel {
     private JPanel cardContainer;
     private JLabel title;
     private MigLayout mainLayout, containerLayout;
+    
+    // Inisialisasi Controller
+    private DashboardController controller;
 
     public PanelDashboard() {
         mainLayout = new MigLayout("fillx, insets 40", "[grow]", "[]30[]");
@@ -19,8 +23,11 @@ public class PanelDashboard extends JPanel {
         setBackground(Color.WHITE);
         setMinimumSize(new Dimension(600, 400));
 
+        // Buat objek controller
+        this.controller = new DashboardController(this);
+
         initializeUI();
-        refreshData();
+        refreshData(); // Panggil data pertama kali
 
         addComponentListener(new ComponentAdapter() {
             @Override
@@ -47,15 +54,21 @@ public class PanelDashboard extends JPanel {
         add(cardContainer, "growx");
     }
 
+    // Tugas refreshData sekarang cuma perintah ke Controller
     public void refreshData() {
-        // View hanya memanggil Worker (Logika N-Tier)
-        new worker.dashboard.LoadDashboardWorker(stats -> {
-            if (stats != null) {
-                lblTotalKostum.setText(String.valueOf(stats.get("total_kostum").intValue()));
-                lblSedangDisewa.setText(String.valueOf(stats.get("sedang_disewa").intValue()));
-                lblTotalPendapatan.setText(String.format("%,.0f", stats.get("total_pendapatan")));
-            }
-        }).execute();
+        controller.muatDataDashboard();
+    }
+
+    /**
+     * Method ini akan dipanggil oleh Controller saat data sudah siap.
+     * Tidak ada lagi Map, sekarang pakai DashboardModel.
+     */
+    public void updateStatistik(DashboardModel model) {
+        if (model != null) {
+            lblTotalKostum.setText(String.valueOf(model.getTotalKostum()));
+            lblSedangDisewa.setText(String.valueOf(model.getSedangDisewa()));
+            lblTotalPendapatan.setText(String.format("%,.0f", model.getTotalPendapatan()));
+        }
     }
 
     private void adjustResponsiveness() {

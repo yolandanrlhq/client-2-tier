@@ -9,13 +9,13 @@ import model.Pesanan;
 public class PesananDaoMySql implements PesananDao {
 
     @Override
-    public void insert(Pesanan p) throws Exception {
+    public boolean insert(Pesanan p) throws Exception {
         String sqlSewa = "INSERT INTO pesanan (id_sewa, nama_penyewa, id_kostum, jumlah, tgl_pinjam, total_biaya, status) VALUES (?, ?, ?, ?, ?, ?, ?)";
         String sqlUpdateStok = "UPDATE kostum SET stok = stok - ? WHERE id_kostum = ?";
         String sqlUpdateStatus = "UPDATE kostum SET status = 'Disewa' WHERE id_kostum = ? AND stok <= 0";
 
         try (Connection conn = DBConfig.getConnection()) {
-            conn.setAutoCommit(false); // Transaksi dimulai
+            conn.setAutoCommit(false); 
             try {
                 // 1. Simpan Pesanan
                 try (PreparedStatement pst = conn.prepareStatement(sqlSewa)) {
@@ -42,9 +42,10 @@ public class PesananDaoMySql implements PesananDao {
                     pstStat.executeUpdate();
                 }
 
-                conn.commit(); // Eksekusi Permanen
+                conn.commit(); 
+                return true; // Berhasil!
             } catch (SQLException e) {
-                conn.rollback(); // Batal semua jika satu gagal
+                conn.rollback(); 
                 throw e;
             }
         }
@@ -75,20 +76,25 @@ public class PesananDaoMySql implements PesananDao {
     }
 
     @Override
-    public void delete(String id) throws Exception {
+    public boolean delete(String id) throws Exception {
         try (Connection conn = DBConfig.getConnection()) {
             String idK = getIdKostumByIdSewa(id);
             if (idK != null) {
-                conn.createStatement().executeUpdate("UPDATE kostum SET status='Tersedia', stok = stok + 1 WHERE id_kostum='" + idK + "'");
+                // Sebaiknya pakai Prepared Statement juga di sini
+                String sqlUpdate = "UPDATE kostum SET status='Tersedia', stok = stok + 1 WHERE id_kostum=?";
+                try (PreparedStatement pstU = conn.prepareStatement(sqlUpdate)) {
+                    pstU.setString(1, idK);
+                    pstU.executeUpdate();
+                }
             }
             PreparedStatement pst = conn.prepareStatement("DELETE FROM pesanan WHERE id_sewa=?");
             pst.setString(1, id);
-            pst.executeUpdate();
+            return pst.executeUpdate() > 0;
         }
     }
 
     @Override
-    public void update(Pesanan p) throws Exception {
+    public boolean update(Pesanan p) throws Exception {
         String sql = "UPDATE pesanan SET nama_penyewa=?, id_kostum=?, jumlah=?, total_biaya=?, status=? WHERE id_sewa=?";
         try (Connection conn = DBConfig.getConnection(); PreparedStatement pst = conn.prepareStatement(sql)) {
             pst.setString(1, p.getNamaPenyewa());
@@ -97,7 +103,7 @@ public class PesananDaoMySql implements PesananDao {
             pst.setDouble(4, p.getTotalBiaya());
             pst.setString(5, p.getStatus());
             pst.setString(6, p.getIdSewa());
-            pst.executeUpdate();
+            return pst.executeUpdate() > 0;
         }
     }
 
